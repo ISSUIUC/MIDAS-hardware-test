@@ -29,7 +29,7 @@
 // #define ENABLE_MAGNETOMETER
 // #define ENABLE_ORIENTATION
 // #define ENABLE_EMMC
-#define ENABLE_ADS
+//#define ENABLE_ADS
 // #define ENABLE_GPIOEXP
  #define ENABLE_GPS
 
@@ -432,7 +432,7 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_GPS
-	    teseo.update();
+	    GNSS_StatusTypeDef status =  teseo.update();
 		GPGGA_Info_t gpgga_message = teseo.getGPGGAData();
 		GPRMC_Info_t gprmc_message = teseo.getGPRMCData();
 		GSV_Info_t gsv_message = teseo.getGSVData();
@@ -459,7 +459,10 @@ void loop() {
 		Serial.print(" Altitude: ");
 		Serial.print(alt);
 		Serial.print(" Velocity: ");
-		Serial.println(v);
+		Serial.print(v);
+		Serial.print(" Status: ");
+		Serial.println(status);
+		Serial.print("Fix indicator: ");
 	#endif
 
 	#ifdef ENABLE_GPIOEXP
