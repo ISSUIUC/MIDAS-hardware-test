@@ -36,12 +36,12 @@
 // #define ENABLE_ORIENTATION
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
-// #define ENABLE_GPIOEXP
+#define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
 // #define ENABLE_CAN
 // #define ENABLE_FLASH
-// #define ENABLE_INA
+#define ENABLE_INA
 
 // Telemetry pins
 #ifdef ENABLE_LORA
@@ -124,14 +124,14 @@ void setup() {
 	pinMode(BNO086_RESET, OUTPUT);
 	pinMode(CAN_CS, OUTPUT);
 	pinMode(RFM96W_CS, OUTPUT);
-	pinMode(21, OUTPUT);
-	pinMode(47, OUTPUT);
+	// pinMode(21, OUTPUT);
+	// pinMode(47, OUTPUT);
 // pinMode(41, OUTPUT);
 // 	pinMode(42, OUTPUT);
 // 	digitalWrite(41, LOW);
 // 	digitalWrite(42, LOW);
-digitalWrite(21, HIGH);
-digitalWrite(47, LOW);
+// digitalWrite(21, HIGH);
+// digitalWrite(47, LOW);
 	digitalWrite(MS5611_CS, HIGH);
 	digitalWrite(LSM6DS3_CS, HIGH);
 	digitalWrite(KX134_CS, HIGH);
@@ -365,7 +365,10 @@ hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an
 
 		Serial.println("TCAL9539 initialized successfully!");
 
-
+		for (int i = 0; i <= 017; i++) {
+			gpioPinMode(GpioAddress(0, i), OUTPUT);
+			gpioDigitalWrite(GpioAddress(0, i), HIGH);
+		}
 		gpioPinMode(GpioAddress(1, 04), INPUT);
 		Serial.println(gpioDigitalRead(GpioAddress(1, 04)).value);
 
