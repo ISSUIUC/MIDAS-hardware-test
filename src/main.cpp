@@ -7,6 +7,7 @@
 #include <SD_MMC.h>
 #include <MicroNMEA.h>
 #include <RH_RF95.h>
+#include <SD_MMC.h>
 // #include <CANBus-SOLDERED.h>
 
 #include "pins.h"
@@ -22,6 +23,9 @@
 #include <Arduino_LSM6DS3.h>
 #include <Adafruit_LIS3MDL.h>
 #include <Adafruit_BNO08x.h>
+#include <SparkFun_u-blox_GNSS_v3.h>
+#include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
+#include <LoRaWan-Arduino.h>
 
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
@@ -29,21 +33,19 @@
 // #define ENABLE_LOWG
 // #define ENABLE_LOWGLSM
 // #define ENABLE_MAGNETOMETER
-#define ENABLE_ORIENTATION
+// #define ENABLE_ORIENTATION
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
 // #define ENABLE_CAN
+// #define ENABLE_FLASH
+// #define ENABLE_INA
 
 // Telemetry pins
 #ifdef ENABLE_LORA
-#define RFM96_CS 1
-#define RFM96_INT 7
-#define RFM96_RESET 15
-#define RF95_FREQ 433.0
-RH_RF95 rf95(RFM96_CS, RFM96_INT);
+hw_config hwConfig;
 #endif
 
 #ifdef ENABLE_BAROMETER
@@ -79,9 +81,14 @@ RH_RF95 rf95(RFM96_CS, RFM96_INT);
 #endif
 
 #ifdef ENABLE_GPS
-TeseoLIV3F teseo(&Wire, GPS_RESET, GPS_ENABLE);
+SFE_UBLOX_GNSS myGNSS;
+char nmeaBuffer[100];
+MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 #endif
 
+#ifdef ENABLE_INA
+
+#endif
 #ifdef ENABLE_CAN
 CANBus CAN(CAN_CS); // Set CS pin
 #endif
@@ -95,8 +102,9 @@ void setup() {
 	delay(1000);
 
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-	Wire.begin(I2C_SDA, I2C_SCL);
-	gpioPinMode(GpioAddress(1, 01), OUTPUT);
+	Wire.begin(PYRO_SDA, PYRO_SCL);
+
+	// Wire.begin(I2C_SDA, I2C_SCL);
 	Serial.println("Initialized SPI");
 
 	// Serial.println("beginning sensor test");
@@ -116,7 +124,14 @@ void setup() {
 	pinMode(BNO086_RESET, OUTPUT);
 	pinMode(CAN_CS, OUTPUT);
 	pinMode(RFM96W_CS, OUTPUT);
-
+	pinMode(21, OUTPUT);
+	pinMode(47, OUTPUT);
+// pinMode(41, OUTPUT);
+// 	pinMode(42, OUTPUT);
+// 	digitalWrite(41, LOW);
+// 	digitalWrite(42, LOW);
+digitalWrite(21, HIGH);
+digitalWrite(47, LOW);
 	digitalWrite(MS5611_CS, HIGH);
 	digitalWrite(LSM6DS3_CS, HIGH);
 	digitalWrite(KX134_CS, HIGH);
@@ -126,14 +141,29 @@ void setup() {
 	digitalWrite(CAN_CS, HIGH);
 	digitalWrite(RFM96W_CS, HIGH);
 
-	gpioDigitalWrite(GpioAddress(1, 01), HIGH); // Set the bno pin mode to 01
-
-	digitalWrite(BNO086_RESET, HIGH);
-
 	digitalWrite(BNO086_RESET, LOW);
-	delay(100);
-	digitalWrite(BNO086_RESET, HIGH);
-
+#ifdef ENABLE_FLASH
+	Serial.println("Connecting to SD...");
+    if (!SD_MMC.setPins(FLASH_CLK, FLASH_CMD, FLASH_DAT0)) {
+        while (1) { Serial.println("No flash!"); }
+    }
+	Serial.println("It's okay");
+    if (!SD_MMC.begin("/sd", true, false, SDMMC_FREQ_52M, 5)) {
+        while (1) { Serial.println("Weird error!"); }
+    }
+	Serial.println("It's really okay");
+	Serial.println(SD_MMC.totalBytes());
+	Serial.println(SD_MMC.usedBytes());
+	Serial.println(SD_MMC.cardType());
+	auto file = SD_MMC.open("/test", FILE_READ, true);
+	if (!file) { 
+		Serial.println("Failed to open file");
+	}
+	Serial.println(SD_MMC.totalBytes());
+	char t[256];
+	file.read((uint8_t*) t, strlen("Hello world"));
+	Serial.println(t);
+#endif
 #ifdef ENABLE_CAN
     // Serial.println("Starting I2C...");
 	CAN.setSPI(&SPI);
@@ -154,39 +184,24 @@ void setup() {
 #endif
 
 #ifdef ENABLE_LORA
-	pinMode(RFM96_RESET, OUTPUT);
-	// pinMode(RFM96_INT, OUTPUT);
-    digitalWrite(RFM96_RESET, HIGH);
-    delay(1000);
-    digitalWrite(RFM96_RESET, LOW);
-    delay(1000);
-    digitalWrite(RFM96_RESET, HIGH);
-    delay(1000);
+hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an SX1262
+	hwConfig.PIN_LORA_RESET = E22_RESET; // LORA RESET
+	hwConfig.PIN_LORA_NSS = E22_CS;	  // LORA SPI CS
+	hwConfig.PIN_LORA_SCLK = SPI_SCK;	  // LORA SPI CLK
+	hwConfig.PIN_LORA_MISO = SPI_MISO;	  // LORA SPI MISO
+	hwConfig.PIN_LORA_DIO_1 = E22_DI01; // LORA DIO_1
+	hwConfig.PIN_LORA_BUSY = E22_BUSY;	  // LORA SPI BUSY
+	hwConfig.PIN_LORA_MOSI = SPI_MOSI;	  // LORA SPI MOSI
+	hwConfig.RADIO_RXEN = E22_RXEN;		  // LORA ANTENNA RX ENABLE
+	hwConfig.USE_DIO2_ANT_SWITCH = true;	  // Example uses an CircuitRocks Alora RFM1262 which uses DIO2 pins as antenna control
+	hwConfig.USE_DIO3_TCXO = false;			  // Example uses an CircuitRocks Alora RFM1262 which uses DIO3 to control oscillator voltage
 
-    if (!rf95.init()) {
-		Serial.println("Couldn't enable RF95");
-        return;
-    }
-    Serial.println("[DEBUG]: Radio Initialized");
 
-    // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf =
-    // 128chips/symbol, CRC on
-
-    if (!rf95.setFrequency(RF95_FREQ)) {
-        Serial.println("Failed to set frequency");
-    }
-    rf95.setSignalBandwidth(125000);
-    rf95.setCodingRate4(8);
-    rf95.setSpreadingFactor(10);
-    rf95.setPayloadCRC(true);
-    /*
-     * The default transmitter power is 13dBm, using PA_BOOST.
-     * If you are using RFM95/96/97/98 modules which uses the PA_BOOST
-     * transmitter pin, then you can set transmitter powers from 5 to 23 dBm:
-     */
-    rf95.setTxPower(23, false);
-
-    sei();
+	uint32_t err_code = lora_hardware_init(hwConfig);
+	if (err_code != 0)
+	{
+		Serial.printf("lora_hardware_init failed - %d\n", err_code);
+	}
 #endif
 	#ifdef ENABLE_BAROMETER
 		MS.init();
@@ -252,30 +267,6 @@ void setup() {
 		LIS3MDL.setDataRate(LIS3MDL_DATARATE_5_HZ);
 		LIS3MDL.setRange(LIS3MDL_RANGE_4_GAUSS);
 		Serial.println("magnetometer init successfully");
-	#endif
-
-	#ifdef ENABLE_ORIENTATION
-
-		/*if (!TCAL9539Init()) {
-			Serial.println("Failed to initialize TCAL9539!");
-			// while(1){ };
-		}
-
-		Serial.println("TCAL9539 initialized successfully!");*/
-		Serial.println("Delaying");
-		delay(1000);
-		Serial.println("Delayed done!");
-		if (!imu.begin_SPI(BNO086_CS, BNO086_INT)) {
-			Serial.println("could not init orientation");
-			while(1) {Serial.println("could not init orientation");}
-		}
-		Serial.println("BNO inited SPI");
-		if (!imu.enableReport(SH2_ARVR_STABILIZED_RV, 5000)) {
-			Serial.println("Could not enable stabilized remote vector");
-			while(1) {Serial.println("Could not enable stabilized remote vector");}
-		}
-		Serial.println("orientation init successfully");
-		
 	#endif
 
 	#ifdef ENABLE_EMMC
@@ -374,25 +365,97 @@ void setup() {
 
 		Serial.println("TCAL9539 initialized successfully!");
 
-		// gpioPinMode(GpioAddress(2, 014), OUTPUT);
-		gpioPinMode(GpioAddress(2, 015), OUTPUT);
-		gpioPinMode(GpioAddress(2, 016), OUTPUT);
-		gpioPinMode(GpioAddress(2, 017), OUTPUT);
 
-		Serial.println("TCAL9539 successfully set pinmode!");
+		gpioPinMode(GpioAddress(1, 04), INPUT);
+		Serial.println(gpioDigitalRead(GpioAddress(1, 04)).value);
 
 	#endif
 
 
 	#ifdef ENABLE_GPS
-	Serial.println("Initing GPS");
-	if (!teseo.init()) {
-		Serial.println("Failed to init GPS");
-	} else {
-		Serial.println("Successfully inited GPS");
+	if (myGNSS.begin() == false)
+	{
+		Serial.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
+		while (1);
 	}
+
+	myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA); //Set the I2C port to output both NMEA and UBX messages
+	myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
+
+	//This will pipe all NMEA sentences to the serial port so we can see them
+	myGNSS.setNMEAOutputPort(Serial);
 	#endif
-	// Serial.println(CAN.checkError());
+	// gpioPinMode(GpioAddress(1, 01), OUTPUT);
+
+	// gpioDigitalWrite(GpioAddress(1, 01), HIGH); // Set the bno pin mode to 01
+
+		
+	#ifdef ENABLE_ORIENTATION
+
+		/*if (!TCAL9539Init()) {
+			Serial.println("Failed to initialize TCAL9539!");
+			// while(1){ };
+		}
+
+		Serial.println("TCAL9539 initialized successfully!");*/
+		Serial.println("Delaying");
+		delay(1000);
+		Serial.println("Delayed done!");
+		if (!imu.begin_SPI(BNO086_CS, BNO086_INT)) {
+			Serial.println("could not init orientation");
+			while(1) {Serial.println("could not init orientation");}
+		}
+		Serial.println("BNO inited SPI");
+		if (!imu.enableReport(SH2_ARVR_STABILIZED_RV, 5000)) {
+			Serial.println("Could not enable stabilized remote vector");
+			while(1) {Serial.println("Could not enable stabilized remote vector");}
+		}
+		Serial.println("orientation init successfully");
+		
+	#endif
+	// Wire1.begin(PYRO_SDA, PYRO_SCL);
+	#ifdef ENABLE_INA
+	Wire.beginTransmission(0x44);
+	Wire.write(0x3E);
+	Wire.endTransmission();
+	Wire.requestFrom(0x44, 2);
+	Serial.println(Wire.read());
+	Serial.println(Wire.read());
+
+	// for (int i = 0; i < )
+	byte error, address;
+  int nDevices;
+  Serial.println("Scanning...");
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+	// Serial.println("Scanning...");
+    Wire.beginTransmission(address);
+	// Serial.println("Scanning2...");
+    error = Wire.endTransmission();
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address<16) {
+        Serial.print("0");
+      }
+      Serial.println(address,HEX);
+      nDevices++;
+    }
+    else if (error==4) {
+      Serial.print("Unknow error at address 0x");
+      if (address<16) {
+        Serial.print("0");
+      }
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0) {
+    Serial.println("No I2C devices found\n");
+  }
+  else {
+    Serial.println("done\n");
+  }
+  delay(5000); 
+	#endif
 }
 
 void loop() {
@@ -537,40 +600,41 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_GPS
-	    GNSS_StatusTypeDef status =  teseo.update();
-		GPGGA_Info_t gpgga_message = teseo.getGPGGAData();
-		GPRMC_Info_t gprmc_message = teseo.getGPRMCData();
-		GSV_Info_t gsv_message = teseo.getGSVData();
+		myGNSS.checkUblox();
+	    // GNSS_StatusTypeDef status =  teseo.update();
+		// GPGGA_Info_t gpgga_message = teseo.getGPGGAData();
+		// GPRMC_Info_t gprmc_message = teseo.getGPRMCData();
+		// GSV_Info_t gsv_message = teseo.getGSVData();
 		
-		double lat = gpgga_message.xyz.lat;
-		double lon = gpgga_message.xyz.lon;
-		float alt = gpgga_message.xyz.alt;
-		float v = gprmc_message.speed;
-		uint16_t sat_count = gpgga_message.sats;
-		double new_lat = floor(lat / 100.) + std::fmod(lat, 100.) / 60.;
-		double new_lon = floor(lon / 100.) + std::fmod(lon, 100.) / 60.;
-		//float n_lat = gpgga_message.xyz.lat / 100.f * ((gpgga_message.xyz.ns == 'N') ? 1. : -1.);
-		//float n_lon = gpgga_message.xyz.lon / 100.f * ((gpgga_message.xyz.ns == 'E') ? 1. : -1.);
-		Serial.print("Time: ");
-		Serial.print(gpgga_message.utc.hh);
-		Serial.print(":");
-		Serial.print(gpgga_message.utc.mm);
-		Serial.print(":");
-		Serial.print(gpgga_message.utc.ss);
-		Serial.print(" Satellite Fixes: ");
-		Serial.print(sat_count);
-		Serial.print("/");
-		Serial.print(gsv_message.tot_sats);
-		Serial.print(" Fix: ");
-		Serial.printf("%f, %f (%f, %f)", new_lat, new_lon, lat, lon);
+		// double lat = gpgga_message.xyz.lat;
+		// double lon = gpgga_message.xyz.lon;
+		// float alt = gpgga_message.xyz.alt;
+		// float v = gprmc_message.speed;
+		// uint16_t sat_count = gpgga_message.sats;
+		// double new_lat = floor(lat / 100.) + std::fmod(lat, 100.) / 60.;
+		// double new_lon = floor(lon / 100.) + std::fmod(lon, 100.) / 60.;
+		// //float n_lat = gpgga_message.xyz.lat / 100.f * ((gpgga_message.xyz.ns == 'N') ? 1. : -1.);
+		// //float n_lon = gpgga_message.xyz.lon / 100.f * ((gpgga_message.xyz.ns == 'E') ? 1. : -1.);
+		// Serial.print("Time: ");
+		// Serial.print(gpgga_message.utc.hh);
+		// Serial.print(":");
+		// Serial.print(gpgga_message.utc.mm);
+		// Serial.print(":");
+		// Serial.print(gpgga_message.utc.ss);
+		// Serial.print(" Satellite Fixes: ");
+		// Serial.print(sat_count);
 		// Serial.print("/");
-		// Serial.print(n_lon);
-		Serial.print(" Altitude: ");
-		Serial.print(alt);
-		Serial.print(" Velocity: ");
-		Serial.print(v);
-		Serial.print(" Status: ");
-		Serial.println(status);
+		// Serial.print(gsv_message.tot_sats);
+		// Serial.print(" Fix: ");
+		// Serial.printf("%f, %f (%f, %f)", new_lat, new_lon, lat, lon);
+		// // Serial.print("/");
+		// // Serial.print(n_lon);
+		// Serial.print(" Altitude: ");
+		// Serial.print(alt);
+		// Serial.print(" Velocity: ");
+		// Serial.print(v);
+		// Serial.print(" Status: ");
+		// Serial.println(status);
 	#endif
 
 	#ifdef ENABLE_GPIOEXP

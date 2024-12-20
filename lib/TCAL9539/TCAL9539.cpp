@@ -23,18 +23,21 @@ bool TCAL9539Init(){
         WIRE.write(REG_OUTPUT0);
         if(!WIRE.endTransmission()){
             Serial.println("Failed at endTransmission");
-            return false;
+            continue;
         }
         int ct = WIRE.requestFrom(addr, 1);
         if(ct != 1){
             Serial.println("Failed at requestFrom");
-            return false;
+            Serial.println("Failed with");
+            Serial.println(addr);
+            Serial.println(ct);
+            continue;
         }
         int v = WIRE.read();
         //REG_OUTPUT0 is set all ones on power up
         if(v != 0xff){
             Serial.println("Failed at REG_OUTPUT0");
-            return false;
+            continue;
         }
     }
     return true;

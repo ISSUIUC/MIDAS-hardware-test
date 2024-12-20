@@ -24,7 +24,6 @@
 #define BNO086_CS 48
 #define BNO086_INT 34
 #define BNO086_RESET 33
-#define BNO086_
 
 // i2c bus pins
 #define I2C_SDA 10
@@ -38,4 +37,22 @@
 #define GNSS_I2C_LOCATION 0x3A
 #define GPS_RESET GpioAddress(2, 017)
 #define GPS_ENABLE 0
-        
+
+#define FLASH_DAT0 13
+#define FLASH_DAT1 12
+#define FLASH_DAT2 15
+#define FLASH_DAT3 16
+#define FLASH_CLK 18
+#define FLASH_CMD 14
+
+#define E22_CS 5
+#define E22_DI01 4
+#define E22_DI03 3
+#define E22_BUSY 6
+#define E22_RXEN 7
+#define E22_RESET 8
+
+#define INA745_ADDR 0x44
+
+#define PYRO_SDA 41
+#define PYRO_SCL 42
