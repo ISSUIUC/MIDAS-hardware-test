@@ -229,7 +229,6 @@ typedef struct
    Geoid_Info_t geoid;	  /**< Geoids data info member */
    int32_t update;		  /**< Update time from the last acquired GPS Info */
    uint32_t checksum;	  /**< Checksum of the message bytes */
-   uint8_t fix_indicator; /** < Position fix indicator*/
 } GPGGA_Info_t;
 
 /**

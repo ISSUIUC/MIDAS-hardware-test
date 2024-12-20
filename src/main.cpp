@@ -6,6 +6,8 @@
 #include <FS.h>
 #include <SD_MMC.h>
 #include <MicroNMEA.h>
+#include <RH_RF95.h>
+// #include <CANBus-SOLDERED.h>
 
 #include "pins.h"
 #include "bno_functions.h"
@@ -27,12 +29,22 @@
 // #define ENABLE_LOWG
 // #define ENABLE_LOWGLSM
 // #define ENABLE_MAGNETOMETER
-// #define ENABLE_ORIENTATION
+#define ENABLE_ORIENTATION
 // #define ENABLE_EMMC
-//#define ENABLE_ADS
+// #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
- #define ENABLE_GPS
+// #define ENABLE_GPS
+// #define ENABLE_LORA
+// #define ENABLE_CAN
 
+// Telemetry pins
+#ifdef ENABLE_LORA
+#define RFM96_CS 1
+#define RFM96_INT 7
+#define RFM96_RESET 15
+#define RF95_FREQ 433.0
+RH_RF95 rf95(RFM96_CS, RFM96_INT);
+#endif
 
 #ifdef ENABLE_BAROMETER
 	MS5611 MS(MS5611_CS);
@@ -55,7 +67,7 @@
 #endif
 
 #ifdef ENABLE_ORIENTATION
-	Adafruit_BNO08x imu(07);
+	Adafruit_BNO08x imu(BNO086_RESET);
 #endif
 
 #ifdef ENABLE_EMMC
@@ -70,6 +82,11 @@
 TeseoLIV3F teseo(&Wire, GPS_RESET, GPS_ENABLE);
 #endif
 
+#ifdef ENABLE_CAN
+CANBus CAN(CAN_CS); // Set CS pin
+#endif
+#define MAX_DATA_SIZE 64
+
 void setup() {
 	Serial.begin(9600);
 
@@ -77,21 +94,26 @@ void setup() {
 
 	delay(1000);
 
-	Serial.println("Starting SPI...");
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+	Wire.begin(I2C_SDA, I2C_SCL);
+	gpioPinMode(GpioAddress(1, 01), OUTPUT);
+	Serial.println("Initialized SPI");
 
-    Serial.println("Starting I2C...");
-    Wire.begin(I2C_SDA, I2C_SCL);
-
-
-	Serial.println("beginning sensor test");
-
-	pinMode(MS5611_CS, OUTPUT);
+	// Serial.println("beginning sensor test");
+	
+	// pinMode(SPI_MOSI, OUTPUT);
+	// while(1) {
+	// 	delay(1000);
+	// 	digitalWrite(SPI_MOSI, LOW);
+	// 	delay(1000);
+	// 	digitalWrite(SPI_MOSI, HIGH);
+	// }
 	pinMode(LSM6DS3_CS, OUTPUT);
 	pinMode(KX134_CS, OUTPUT);
 	pinMode(ADXL355_CS, OUTPUT);
 	pinMode(LIS3MDL_CS, OUTPUT);
 	pinMode(BNO086_CS, OUTPUT);
+	pinMode(BNO086_RESET, OUTPUT);
 	pinMode(CAN_CS, OUTPUT);
 	pinMode(RFM96W_CS, OUTPUT);
 
@@ -104,7 +126,68 @@ void setup() {
 	digitalWrite(CAN_CS, HIGH);
 	digitalWrite(RFM96W_CS, HIGH);
 
+	gpioDigitalWrite(GpioAddress(1, 01), HIGH); // Set the bno pin mode to 01
 
+	digitalWrite(BNO086_RESET, HIGH);
+
+	digitalWrite(BNO086_RESET, LOW);
+	delay(100);
+	digitalWrite(BNO086_RESET, HIGH);
+
+#ifdef ENABLE_CAN
+    // Serial.println("Starting I2C...");
+	CAN.setSPI(&SPI);
+	while (0 != CAN.begin(CAN_125K_500K))// Initialize CAN BUS with baud rate of 125 kbps and arbitration rate of 500k
+		// This should be in while loop because MCP2518
+		// needs some time to initialize and start function
+		// properly.
+	{
+		Serial.println("CAN init fail, retry..."); // Print information message
+		delay(100);
+	}
+	Serial.println("CAN init ok!");
+
+	for (int i = 0; i < MAX_DATA_SIZE; i++) // Fill buffer with ascending numbers 
+	{
+		stmp[i] = i;
+	}
+#endif
+
+#ifdef ENABLE_LORA
+	pinMode(RFM96_RESET, OUTPUT);
+	// pinMode(RFM96_INT, OUTPUT);
+    digitalWrite(RFM96_RESET, HIGH);
+    delay(1000);
+    digitalWrite(RFM96_RESET, LOW);
+    delay(1000);
+    digitalWrite(RFM96_RESET, HIGH);
+    delay(1000);
+
+    if (!rf95.init()) {
+		Serial.println("Couldn't enable RF95");
+        return;
+    }
+    Serial.println("[DEBUG]: Radio Initialized");
+
+    // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf =
+    // 128chips/symbol, CRC on
+
+    if (!rf95.setFrequency(RF95_FREQ)) {
+        Serial.println("Failed to set frequency");
+    }
+    rf95.setSignalBandwidth(125000);
+    rf95.setCodingRate4(8);
+    rf95.setSpreadingFactor(10);
+    rf95.setPayloadCRC(true);
+    /*
+     * The default transmitter power is 13dBm, using PA_BOOST.
+     * If you are using RFM95/96/97/98 modules which uses the PA_BOOST
+     * transmitter pin, then you can set transmitter powers from 5 to 23 dBm:
+     */
+    rf95.setTxPower(23, false);
+
+    sei();
+#endif
 	#ifdef ENABLE_BAROMETER
 		MS.init();
 		Serial.println("barometer init successfully");
@@ -180,35 +263,36 @@ void setup() {
 
 		Serial.println("TCAL9539 initialized successfully!");*/
 		Serial.println("Delaying");
-		delay(5000);
-
+		delay(1000);
+		Serial.println("Delayed done!");
 		if (!imu.begin_SPI(BNO086_CS, BNO086_INT)) {
 			Serial.println("could not init orientation");
-			while(1);
+			while(1) {Serial.println("could not init orientation");}
 		}
+		Serial.println("BNO inited SPI");
 		if (!imu.enableReport(SH2_ARVR_STABILIZED_RV, 5000)) {
 			Serial.println("Could not enable stabilized remote vector");
-			while(1);
+			while(1) {Serial.println("Could not enable stabilized remote vector");}
 		}
 		Serial.println("orientation init successfully");
 		
 	#endif
 
 	#ifdef ENABLE_EMMC
-		if(!SD_MMC.setPins(EMMC_CLK, EMMC_CMD, EMMC_D0, EMMC_D1, EMMC_D2, EMMC_D3)){
+		if(!SD_MMC.setPins(EMMC_CLK, EMMC_CMD, EMMC_D0)){
 			Serial.println("Pin change failed!");
 			return;
 		}
 		// if(!SD_MMC.begin()){
-		if(!SD_MMC.begin("/sdcard", false, true, SDMMC_FREQ_52M, 5)){
+
+		if(!SD_MMC.begin("/sdcard", true, true, SDMMC_FREQ_52M, 5)){
 			Serial.println("Card Mount Failed");
-			return;
+			;
 		}
 		uint8_t cardType = SD_MMC.cardType();
 
 		if(cardType == CARD_NONE){
 			Serial.println("No SD_MMC card attached");
-			return;
 		}
 
 		Serial.print("SD_MMC Card Type: ");
@@ -290,10 +374,10 @@ void setup() {
 
 		Serial.println("TCAL9539 initialized successfully!");
 
-		gpioPinMode(GpioAddress(2, 013), OUTPUT);
-		gpioPinMode(GpioAddress(2, 014), OUTPUT);
+		// gpioPinMode(GpioAddress(2, 014), OUTPUT);
 		gpioPinMode(GpioAddress(2, 015), OUTPUT);
 		gpioPinMode(GpioAddress(2, 016), OUTPUT);
+		gpioPinMode(GpioAddress(2, 017), OUTPUT);
 
 		Serial.println("TCAL9539 successfully set pinmode!");
 
@@ -308,27 +392,48 @@ void setup() {
 		Serial.println("Successfully inited GPS");
 	}
 	#endif
+	// Serial.println(CAN.checkError());
 }
 
 void loop() {
 
+	#ifdef ENABLE_CAN
+	auto err_code = CAN.sendMsgBuf(0x01, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
+	if (err_code != 0) {
+		Serial.print("Failed: ");
+		Serial.println(err_code);
+
+	} else {
+		Serial.println("CAN BUS sendMsgBuf ok!"); // Print message
+	}
+	// First parameter - which ID to set in frame (ID of transmitter)
+	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
+	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
+	// Fourth parameter - Buffer which contains data to send
+	// delay(10); // Wait a bit for CAN module to send data
+	// CAN.sendMsgBuf(0x04, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
+	// First parameter - which ID to set in frame (ID of transmitter)
+	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
+	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
+	// Fourth parameter - Buffer which contains data to send
+	delay(1000); // Wait a bit not to overfill network
+	#endif
 	#ifdef ENABLE_GPIOEXP
 
-		gpioDigitalWrite(GpioAddress(2, 013), HIGH);
-		delay(100);
-		gpioDigitalWrite(GpioAddress(2, 014), HIGH);
-		delay(100);
+		// gpioDigitalWrite(GpioAddress(2, 014), HIGH);
 		gpioDigitalWrite(GpioAddress(2, 015), HIGH);
-		delay(100);
-		gpioDigitalWrite(GpioAddress(2, 016), HIGH);
-		delay(100);
-		Serial.println("Looped high");
-		gpioDigitalWrite(GpioAddress(2, 013), LOW);
-		gpioDigitalWrite(GpioAddress(2, 014), LOW);
+		delay(200);
 		gpioDigitalWrite(GpioAddress(2, 015), LOW);
-		gpioDigitalWrite(GpioAddress(2, 016), LOW);
-		Serial.println("Looped");
-		delay(500);
+		gpioDigitalWrite(GpioAddress(2, 017), HIGH);
+		delay(200);
+		gpioDigitalWrite(GpioAddress(2, 017), LOW);
+		// Serial.println("Looped high");
+		// // gpioDigitalWrite(GpioAddress(2, 014), LOW);
+		// gpioDigitalWrite(GpioAddress(2, 015), LOW);
+		// gpioDigitalWrite(GpioAddress(2, 016), LOW);
+		// gpioDigitalWrite(GpioAddress(2, 017), LOW);
+		// Serial.println("Looped");
+		// delay(500);
 		
 	#endif
 
@@ -436,12 +541,16 @@ void loop() {
 		GPGGA_Info_t gpgga_message = teseo.getGPGGAData();
 		GPRMC_Info_t gprmc_message = teseo.getGPRMCData();
 		GSV_Info_t gsv_message = teseo.getGSVData();
-		float lat = gpgga_message.xyz.lat;
-		float lon = gpgga_message.xyz.lon;
+		
+		double lat = gpgga_message.xyz.lat;
+		double lon = gpgga_message.xyz.lon;
 		float alt = gpgga_message.xyz.alt;
 		float v = gprmc_message.speed;
 		uint16_t sat_count = gpgga_message.sats;
-
+		double new_lat = floor(lat / 100.) + std::fmod(lat, 100.) / 60.;
+		double new_lon = floor(lon / 100.) + std::fmod(lon, 100.) / 60.;
+		//float n_lat = gpgga_message.xyz.lat / 100.f * ((gpgga_message.xyz.ns == 'N') ? 1. : -1.);
+		//float n_lon = gpgga_message.xyz.lon / 100.f * ((gpgga_message.xyz.ns == 'E') ? 1. : -1.);
 		Serial.print("Time: ");
 		Serial.print(gpgga_message.utc.hh);
 		Serial.print(":");
@@ -452,22 +561,21 @@ void loop() {
 		Serial.print(sat_count);
 		Serial.print("/");
 		Serial.print(gsv_message.tot_sats);
-		Serial.print(" Latitude: ");
-		Serial.print(lat);
-		Serial.print(" Longitude: ");
-		Serial.print(lon);
+		Serial.print(" Fix: ");
+		Serial.printf("%f, %f (%f, %f)", new_lat, new_lon, lat, lon);
+		// Serial.print("/");
+		// Serial.print(n_lon);
 		Serial.print(" Altitude: ");
 		Serial.print(alt);
 		Serial.print(" Velocity: ");
 		Serial.print(v);
 		Serial.print(" Status: ");
 		Serial.println(status);
-		Serial.print("Fix indicator: ");
 	#endif
 
 	#ifdef ENABLE_GPIOEXP
 	#endif
-
-	delay(500);
+	// Serial.println("Hello world!");
+	delay(50);
 }
 

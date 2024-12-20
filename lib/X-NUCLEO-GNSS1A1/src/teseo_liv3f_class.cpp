@@ -214,8 +214,10 @@ GNSS_StatusTypeDef TeseoLIV3F::I2CRead(uint16_t RegisterAddr, uint8_t* pBuffer, 
    {
       pBuffer[i] = dev_i2c->read();
       i++;
+      if(i >= NumByteToRead){
+         i = NumByteToRead - 1;
+      }
    }
-
    return (GNSS_StatusTypeDef) status;
 }
 
@@ -310,7 +312,7 @@ GNSSParser_Status_t TeseoLIV3F::GNSS_PARSER_CheckSanity(uint8_t *pSentence, uint
 GNSSParser_Status_t TeseoLIV3F::GNSS_PARSER_ParseMsg(GNSSParser_Data_t *pGNSSParser_Data, uint8_t msg, uint8_t *pBuffer)
 {
    ParseStatus_t status = PARSE_FAIL;
-   Serial.println((char*) pBuffer);
+
    switch(msg)
    {
    case GPGGA:
@@ -422,7 +424,6 @@ ParseStatus_t TeseoLIV3F::NMEA_ParseGPGGA(GPGGA_Info_t *pGPGGAInfo, uint8_t NMEA
          pGPGGAInfo->xyz.ns = *((uint8_t*)app[3]);
          pGPGGAInfo->xyz.lon = strtod((char *)app[4], NULL);
          pGPGGAInfo->xyz.ew = *((uint8_t*)app[5]);
-         pGPGGAInfo->fix_indicator = atoi((char*) app[6]);
          pGPGGAInfo->sats = strtol((char *)app[7], NULL, BASE);
          pGPGGAInfo->acc = strtof((char *)app[8], NULL);
          pGPGGAInfo->xyz.alt = strtof((char *)app[9], NULL);
@@ -1911,5 +1912,3 @@ uint32_t TeseoLIV3F::char2int(uint8_t c)
 
    return ret;
 }
-
-

@@ -94,10 +94,9 @@ class TeseoLIV3F
 
 public:
 
-   TeseoLIV3F(TwoWire *i2c, int resetPin, int enablePin) : dev_i2c(i2c), pinRes(resetPin), pinEn(enablePin)
+   TeseoLIV3F(TwoWire *i2c, GpioAddress reset, int enablePin) : dev_i2c(i2c), pinReset(reset), pinEn(enablePin)
    {
-      Serial.println("Initing gpio");
-      gpioPinMode(GpioAddress(2, 017), OUTPUT);
+      gpioPinMode(pinReset, OUTPUT);
 
       //pinMode(pinEn, OUTPUT);
       useI2C = 1;
@@ -105,19 +104,7 @@ public:
       i2ch.index = 0;
       i2ch.end = 0;
       commandDone = 1;
-      Serial.println("Couldnt init gpio");
    }
-
-   TeseoLIV3F(HardwareSerial *uart, int resetPin, int enablePin) : dev_uart(uart), pinRes(resetPin), pinEn(enablePin)
-   {
-      pinMode(pinRes, OUTPUT);
-      pinMode(pinEn, OUTPUT);
-      uarth.stringComplete = false;
-      uarth.index = 0;
-      uarth.end = 0;
-      commandDone = 1;
-   }
-
    /**
     * @brief       Initialize the sensor and the data structures
     * @note		in case of I2C communication, the TwoWire @a begin() should always be called after this function
@@ -125,12 +112,10 @@ public:
     */
    GNSS_StatusTypeDef init()
    {
-      gpioDigitalWrite(GpioAddress(2, 017), LOW);
-      Serial.println("Ressetting GPS");
-      delay(1000);
-      gpioDigitalWrite(GpioAddress(2, 017), HIGH);
-      delay(5000);
-      Serial.println("Resetted GPS");
+      gpioDigitalWrite(pinReset, LOW);
+      delay(250);
+      gpioDigitalWrite(pinReset, HIGH);
+      delay(250);
       GNSS_PARSER_Init(&data);
       if (useI2C)
       {
@@ -146,7 +131,7 @@ public:
       sendCommand((char *)"$PSTMRESTOREPAR");
       sendCommand((char *)"$PSTMSRR");
       Wire.endTransmission(false);
-      delay(4000);
+      delay(2000);
       return GNSS_OK;
    }
 
@@ -586,7 +571,7 @@ protected:
    int useI2C = DEFAULT_BUS;
    TwoWire *dev_i2c = DEFAULT_I2C;
    HardwareSerial *dev_uart = DEFAULT_UART;
-   int pinRes;
+   GpioAddress pinReset;
    int pinEn;
    int commandDone;
    char compareMessage[MAX_RESPONSE_LENGTH];

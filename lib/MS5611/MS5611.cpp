@@ -41,7 +41,7 @@
 
 #include <SPI.h>
 SPISettings settingsA(
-    1000000, MSBFIRST,
+    100000, MSBFIRST,
     SPI_MODE0);  // define SPI settings; limit SPI communication to 1MHz
 
 /////////////////////////////////////////////////////
