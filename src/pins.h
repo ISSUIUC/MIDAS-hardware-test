@@ -29,6 +29,10 @@
 #define I2C_SDA 10
 #define I2C_SCL 9
 
+// buzzer pin
+#define BUZZER_PIN 17
+#define BUZZER_CHANNEL 1
+
 // CAN pins
 #define CAN_CS 2
 #define RFM96W_CS 5

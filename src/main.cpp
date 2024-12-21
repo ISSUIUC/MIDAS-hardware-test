@@ -27,6 +27,7 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
+#define WAIT_FOR_SERIAL
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
 // #define ENABLE_HIGHG
@@ -36,16 +37,20 @@
 // #define ENABLE_ORIENTATION
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
-#define ENABLE_GPIOEXP
+// #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
 // #define ENABLE_CAN
 // #define ENABLE_FLASH
-#define ENABLE_INA
+// #define ENABLE_INA
+// #define ENABLE_CHRISTMAS
 
-// Telemetry pins
+// Please be careful
+// This will init the gpio expander by itself
+#define PYRO_TEST
+
 #ifdef ENABLE_LORA
-hw_config hwConfig;
+	hw_config hwConfig;
 #endif
 
 #ifdef ENABLE_BAROMETER
@@ -76,9 +81,6 @@ hw_config hwConfig;
 	uint8_t buff[8192];
 #endif
 
-#ifdef ENABLE_GPIOEXP
-
-#endif
 
 #ifdef ENABLE_GPS
 SFE_UBLOX_GNSS myGNSS;
@@ -94,17 +96,107 @@ CANBus CAN(CAN_CS); // Set CS pin
 #endif
 #define MAX_DATA_SIZE 64
 
+#ifdef PYRO_TEST
+	int CUR_PYRO = 0; // 0 --> off, 1-->A, 2-->B, 3-->C, 4-->D
+
+#endif
+
+
+#ifdef ENABLE_LORA
+
+#define RF_FREQUENCY 430000000  // Hz
+#define TX_OUTPUT_POWER 22		// dBm
+#define LORA_BANDWIDTH 0		// [0: 125 kHz, 1: 250 kHz, 2: 500 kHz, 3: Reserved]
+#define LORA_SPREADING_FACTOR 8 // [SF7..SF12]
+#define LORA_CODINGRATE 4		// [1: 4/5, 2: 4/6,  3: 4/7,  4: 4/8]
+#define LORA_PREAMBLE_LENGTH 8  // Same for Tx and Rx
+#define LORA_SYMBOL_TIMEOUT 0   // Symbols
+#define LORA_FIX_LENGTH_PAYLOAD_ON false
+#define LORA_IQ_INVERSION_ON false
+#define RX_TIMEOUT_VALUE 3000
+#define TX_TIMEOUT_VALUE 3000
+#define LORA_BUFFER_SIZE 64 // Define the payload size here
+
+void OnTxDone(void);
+void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
+void OnTxTimeout(void);
+void OnRxTimeout(void);
+void OnRxError(void);
+void OnCadDone(bool cadResult);
+
+static RadioEvents_t RadioEvents;
+static uint16_t BufferSize = LORA_BUFFER_SIZE;
+static uint8_t RcvBuffer[LORA_BUFFER_SIZE];
+static uint8_t TxdBuffer[LORA_BUFFER_SIZE];
+static bool isMaster = true;
+const uint8_t PingMsg[] = "PING";
+const uint8_t PongMsg[] = "PONG";
+
+time_t timeToSend;
+time_t cadTime;
+uint8_t pingCnt = 0;
+uint8_t pongCnt = 0;
+
+// Lora callbacks
+void OnTxDone(void)
+{
+	Serial.println("LoRa Callback - OnTxDone");
+	Radio.Rx(RX_TIMEOUT_VALUE);
+}
+
+void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
+{
+	Serial.println("LoRa Callback - OnRxDone");
+	delay(10);
+}
+
+void OnTxTimeout(void)
+{
+	Serial.println("LoRa Callback - OnTxTimeout");
+	Radio.Rx(RX_TIMEOUT_VALUE);
+}
+
+void OnRxTimeout(void)
+{
+	Serial.println("LoRa Callback - OnRxTimeout");
+	Radio.Rx(RX_TIMEOUT_VALUE);
+}
+
+void OnRxError(void)
+{
+	Serial.println("RX ERR!");
+}
+
+void OnCadDone(bool cadResult)
+{
+	Serial.println("fr i dont know what this does");
+}
+#endif
+
+#ifdef ENABLE_CHRISTMAS
+// I wanted to be cute
+#include <buzzer.h>
+
+bool cur_light_state = false;
+
+#endif
+
 void setup() {
 	Serial.begin(9600);
 
-	while(!Serial);
+
+	#ifdef WAIT_FOR_SERIAL
+		while(!Serial);
+		Serial.println("Serial ready");
+	#endif
+
 
 	delay(1000);
 
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-	Wire.begin(PYRO_SDA, PYRO_SCL);
+	// Wire.begin(PYRO_SDA, PYRO_SCL);
 
-	// Wire.begin(I2C_SDA, I2C_SCL);
+	Wire.begin(I2C_SDA, I2C_SCL);
 	Serial.println("Initialized SPI");
 
 	// Serial.println("beginning sensor test");
@@ -142,6 +234,13 @@ void setup() {
 	digitalWrite(RFM96W_CS, HIGH);
 
 	digitalWrite(BNO086_RESET, LOW);
+
+#ifdef ENABLE_CHRISTMAS
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
+    ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+#endif
+
 #ifdef ENABLE_FLASH
 	Serial.println("Connecting to SD...");
     if (!SD_MMC.setPins(FLASH_CLK, FLASH_CMD, FLASH_DAT0)) {
@@ -184,7 +283,10 @@ void setup() {
 #endif
 
 #ifdef ENABLE_LORA
-hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an SX1262
+
+	Serial.println("Initializing LoRa");
+
+	hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an SX1262
 	hwConfig.PIN_LORA_RESET = E22_RESET; // LORA RESET
 	hwConfig.PIN_LORA_NSS = E22_CS;	  // LORA SPI CS
 	hwConfig.PIN_LORA_SCLK = SPI_SCK;	  // LORA SPI CLK
@@ -196,12 +298,53 @@ hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an
 	hwConfig.USE_DIO2_ANT_SWITCH = true;	  // Example uses an CircuitRocks Alora RFM1262 which uses DIO2 pins as antenna control
 	hwConfig.USE_DIO3_TCXO = false;			  // Example uses an CircuitRocks Alora RFM1262 which uses DIO3 to control oscillator voltage
 
+	Serial.println("LoRa config set");
 
 	uint32_t err_code = lora_hardware_init(hwConfig);
 	if (err_code != 0)
 	{
 		Serial.printf("lora_hardware_init failed - %d\n", err_code);
+		while(1) {};
 	}
+	Serial.println("Lora hardware init successful");
+	
+	RadioEvents.TxDone = OnTxDone;
+	RadioEvents.RxDone = OnRxDone;
+	RadioEvents.TxTimeout = OnTxTimeout;
+	RadioEvents.RxTimeout = OnRxTimeout;
+	RadioEvents.RxError = OnRxError;
+	RadioEvents.CadDone = OnCadDone;
+	Serial.println("Lora callbacks set");
+
+	// Initialize the Radio
+	Radio.Init(&RadioEvents);
+
+	// Set Radio channel
+	Radio.SetChannel(RF_FREQUENCY);
+	Serial.println("Lora radio channel init successful");
+
+	// Set Radio TX configuration
+	Radio.SetTxConfig(MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
+					  LORA_SPREADING_FACTOR, LORA_CODINGRATE,
+					  LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+					  true, 0, 0, LORA_IQ_INVERSION_ON, TX_TIMEOUT_VALUE);
+
+	// Set Radio RX configuration
+	Radio.SetRxConfig(MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
+					  LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+					  LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+					  0, true, 0, 0, LORA_IQ_INVERSION_ON, true);
+
+	Serial.println("Lora radio rx/tx config successful");
+
+	Serial.println("Starting Radio.Rx");
+	Radio.Rx(RX_TIMEOUT_VALUE);
+	timeToSend = millis();
+
+	Serial.println("LoRa Init Successful");
+	
+
+
 #endif
 	#ifdef ENABLE_BAROMETER
 		MS.init();
@@ -366,14 +509,38 @@ hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an
 		Serial.println("TCAL9539 initialized successfully!");
 
 		for (int i = 0; i <= 017; i++) {
-			gpioPinMode(GpioAddress(0, i), OUTPUT);
-			gpioDigitalWrite(GpioAddress(0, i), HIGH);
+			gpioPinMode(GpioAddress(2, i), OUTPUT);
+			gpioDigitalWrite(GpioAddress(2, i), LOW);
 		}
 		gpioPinMode(GpioAddress(1, 04), INPUT);
 		Serial.println(gpioDigitalRead(GpioAddress(1, 04)).value);
 
 	#endif
 
+	#ifdef PYRO_TEST
+
+		pinMode(BUZZER_PIN, OUTPUT);
+		digitalWrite(BUZZER_PIN, LOW);
+		ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+
+		if (!TCAL9539Init()) {
+			Serial.println("Failed to initialize TCAL9539!");
+			// while(1){ };
+		}
+
+		Serial.println("TCAL9539 initialized successfully!");
+
+		for (int i = 0; i <= 017; i++) {
+			gpioPinMode(GpioAddress(2, i), OUTPUT);
+			gpioDigitalWrite(GpioAddress(2, i), LOW);
+		}
+
+		for (int i = 0; i <= 017; i++) {
+			gpioPinMode(GpioAddress(0, i), OUTPUT);
+			gpioDigitalWrite(GpioAddress(0, i), LOW);
+		}
+
+	#endif
 
 	#ifdef ENABLE_GPS
 	if (myGNSS.begin() == false)
@@ -484,6 +651,37 @@ void loop() {
 	// Fourth parameter - Buffer which contains data to send
 	delay(1000); // Wait a bit not to overfill network
 	#endif
+
+	#ifdef MCU_TEST
+		Serial.println("test");
+	#endif
+
+	#ifdef ENABLE_CHRISTMAS
+		// just play the entire song
+		// assume gpio is enabled this is for fun anyway
+
+		Serial.println("Playing song!");
+
+		for(unsigned i = 0; i < MERRY_CHRISTMAS_LENGTH; i++) {
+
+			cur_light_state = !cur_light_state;
+
+			gpioDigitalWrite(GpioAddress(2, 014), LOW);
+			gpioDigitalWrite(GpioAddress(2, 016), LOW);
+			gpioDigitalWrite(GpioAddress(2, 015), cur_light_state ? HIGH : LOW);
+			gpioDigitalWrite(GpioAddress(2, 017), cur_light_state ? LOW : HIGH);
+
+			Sound cur_sound = merry_christmas[i];
+			ledcWriteTone(BUZZER_CHANNEL, cur_sound.frequency);
+			delay(cur_sound.duration_ms);
+		}
+
+		Serial.println("Delaying 2s before playing again");
+		delay(2000);
+		
+
+	#endif
+
 	#ifdef ENABLE_GPIOEXP
 
 		// gpioDigitalWrite(GpioAddress(2, 014), HIGH);
@@ -500,11 +698,89 @@ void loop() {
 		// gpioDigitalWrite(GpioAddress(2, 017), LOW);
 		// Serial.println("Looped");
 		// delay(500);
-		
 	#endif
 
-	#ifdef MCU_TEST
-		Serial.println("test");
+	#ifdef PYRO_TEST
+
+		// // force-disable all pyro
+		// gpioDigitalWrite(GpioAddress(0, 06), LOW); // pyro disabled
+
+		// gpioDigitalWrite(GpioAddress(0, 00), LOW);
+		// gpioDigitalWrite(GpioAddress(0, 01), LOW);
+		// gpioDigitalWrite(GpioAddress(0, 03), LOW);
+		// gpioDigitalWrite(GpioAddress(0, 04), LOW);
+
+		// // Red pin, no noise, 10s
+		// gpioDigitalWrite(GpioAddress(2, 017), HIGH);
+		// delay(5000);
+
+		// // Red pin, noise, 5s
+
+		// for(unsigned i = 0; i < 3; i++) {
+			
+		// 	ledcWriteTone(BUZZER_CHANNEL, 2000);
+		// 	delay(100);
+		// 	ledcWriteTone(BUZZER_CHANNEL, 0);
+		// 	delay(900);	
+			
+		// }
+
+		// // Red pin, fast noise, 2s
+
+		// for(unsigned i = 0; i < 2*4; i++) {
+		// 	ledcWriteTone(BUZZER_CHANNEL, 2000);
+		// 	delay(150);
+		// 	ledcWriteTone(BUZZER_CHANNEL, 0);
+		// 	delay(100);
+		// }
+
+		// // fire pyro
+
+		// gpioDigitalWrite(GpioAddress(0, 06), HIGH); // pyro enabled
+
+		// gpioDigitalWrite(GpioAddress(0, 00), HIGH);
+		// gpioDigitalWrite(GpioAddress(0, 01), HIGH);
+		// gpioDigitalWrite(GpioAddress(0, 03), HIGH);
+		// gpioDigitalWrite(GpioAddress(0, 04), HIGH);
+
+		// delay(200);
+
+		// gpioDigitalWrite(GpioAddress(0, 06), LOW); // pyro disabled
+
+		// gpioDigitalWrite(GpioAddress(0, 00), LOW);
+		// gpioDigitalWrite(GpioAddress(0, 01), LOW);
+		// gpioDigitalWrite(GpioAddress(0, 03), LOW);
+		// gpioDigitalWrite(GpioAddress(0, 04), LOW);
+
+		// // no red pin for 5s
+		// gpioDigitalWrite(GpioAddress(2, 017), LOW);
+		// delay(5000);
+
+
+		
+
+
+		char* buf[255];
+
+		gpioDigitalWrite(GpioAddress(0, 06), CUR_PYRO == 0 ? LOW : HIGH); // pyro enabled only if not 0
+		gpioDigitalWrite(GpioAddress(0, 00), CUR_PYRO == 1 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 01), CUR_PYRO == 2 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 03), CUR_PYRO == 3 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 04), CUR_PYRO == 4 ? HIGH : LOW);
+
+		gpioDigitalWrite(GpioAddress(2, 016), CUR_PYRO == 0 ? HIGH : LOW);
+
+		size_t bytes_read = Serial.readBytesUntil('\n', (char*)&buf, 10);
+		if(bytes_read > 0) {
+			CUR_PYRO = (CUR_PYRO + 1) % 5;
+			gpioDigitalWrite(GpioAddress(2, 015), HIGH);
+			delay(50);
+			gpioDigitalWrite(GpioAddress(2, 015), LOW);
+			Serial.printf("Cur pyro: %d\n", CUR_PYRO);
+		}
+
+
+
 	#endif
 
 	#ifdef ENABLE_BAROMETER
@@ -640,8 +916,18 @@ void loop() {
 		// Serial.println(status);
 	#endif
 
-	#ifdef ENABLE_GPIOEXP
+	#ifdef ENABLE_LORA
+
+		Serial.println("Sending LoRa message");
+
+		memcpy(TxdBuffer, PingMsg, sizeof(PingMsg));
+		BufferSize = sizeof(PingMsg);
+		Radio.Send(TxdBuffer, BufferSize); // Sends the PING
+
+		delay(1000);
+
 	#endif
+
 	// Serial.println("Hello world!");
 	delay(50);
 }
