@@ -38,13 +38,13 @@
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
-// #define ENABLE_GPS
+#define ENABLE_GPS
 // #define ENABLE_LORA
 // #define ENABLE_CAN
 // #define ENABLE_FLASH
 // #define ENABLE_INA
 // #define ENABLE_CHRISTMAS
-#define ENABLE_PWR_MONITOR
+// #define ENABLE_PWR_MONITOR
 
 // Please be careful
 // This will init the gpio expander by itself
@@ -788,26 +788,20 @@ void loop() {
 		// gpioDigitalWrite(GpioAddress(2, 017), LOW);
 		// delay(5000);
 
-
-		
-
-
 		char* buf[255];
 
-		gpioDigitalWrite(GpioAddress(0, 06), CUR_PYRO == 0 ? LOW : HIGH); // pyro enabled only if not 0
-		gpioDigitalWrite(GpioAddress(0, 00), CUR_PYRO == 1 ? HIGH : LOW);
-		gpioDigitalWrite(GpioAddress(0, 01), CUR_PYRO == 2 ? HIGH : LOW);
-		gpioDigitalWrite(GpioAddress(0, 03), CUR_PYRO == 3 ? HIGH : LOW);
-		gpioDigitalWrite(GpioAddress(0, 04), CUR_PYRO == 4 ? HIGH : LOW);
-
-		gpioDigitalWrite(GpioAddress(2, 016), CUR_PYRO == 0 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 05), CUR_PYRO == 0 ? LOW : HIGH); // pyro enabled only if not 0
+		gpioDigitalWrite(GpioAddress(0, 04), CUR_PYRO == 1 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 03), CUR_PYRO == 2 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 01), CUR_PYRO == 3 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 00), CUR_PYRO == 4 ? HIGH : LOW);
 
 		size_t bytes_read = Serial.readBytesUntil('\n', (char*)&buf, 10);
 		if(bytes_read > 0) {
 			CUR_PYRO = (CUR_PYRO + 1) % 5;
-			gpioDigitalWrite(GpioAddress(2, 015), HIGH);
-			delay(50);
-			gpioDigitalWrite(GpioAddress(2, 015), LOW);
+			// gpioDigitalWrite(GpioAddress(2, 015), HIGH);
+			// delay(50);
+			// gpioDigitalWrite(GpioAddress(2, 015), LOW);
 			Serial.printf("Cur pyro: %d\n", CUR_PYRO);
 		}
 
