@@ -1,7 +1,7 @@
 #include"TCAL9539.h"
 #include<Wire.h>
 
-#define WIRE Wire
+#define WIRE Wire1
 
 
 static constexpr uint8_t REG_INPUT0 = 0x0;

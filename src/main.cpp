@@ -29,22 +29,23 @@
 
 #define WAIT_FOR_SERIAL
 // #define MCU_TEST
-// #define ENABLE_BAROMETER
-// #define ENABLE_HIGHG
-// #define ENABLE_LOWG
-// #define ENABLE_LOWGLSM
-// #define ENABLE_MAGNETOMETER
+// #define ENABLE_BAROMETER Y
+// #define ENABLE_HIGHG Y
+// #define ENABLE_LOWG Y
+// #define ENABLE_LOWGLSM Y
+// #define ENABLE_MAGNETOMETER Y 0.5
 // #define ENABLE_ORIENTATION
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
+#define ENABLE_PYRO_MONITOR
 // #define ENABLE_GPS
 // #define ENABLE_LORA
-// #define ENABLE_CAN
-// #define ENABLE_FLASH
+// #define ENABLE_CAN// #define ENABLE_FLASH
 // #define ENABLE_INA
 // #define ENABLE_CHRISTMAS
 #define ENABLE_PWR_MONITOR
+
 
 // Please be careful
 // This will init the gpio expander by itself
@@ -63,7 +64,7 @@
 #endif
 
 #ifdef ENABLE_LOWG
-	PL::ADXL355 sensor(ADXL355_CS);
+	PL::ADXL355 sensor(ADXL355_CS, 1000000);
 #endif
 
 #ifdef ENABLE_LOWGLSM
@@ -130,8 +131,8 @@ static uint16_t BufferSize = LORA_BUFFER_SIZE;
 static uint8_t RcvBuffer[LORA_BUFFER_SIZE];
 static uint8_t TxdBuffer[LORA_BUFFER_SIZE];
 static bool isMaster = true;
-const uint8_t PingMsg[] = "PING";
-const uint8_t PongMsg[] = "PONG";
+const uint8_t PingMsg[] = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
+const uint8_t PongMsg[] = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
 
 time_t timeToSend;
 time_t cadTime;
@@ -185,12 +186,10 @@ bool cur_light_state = false;
 void setup() {
 	Serial.begin(9600);
 
-
 	#ifdef WAIT_FOR_SERIAL
 		while(!Serial);
 		Serial.println("Serial ready");
 	#endif
-
 
 	delay(1000);
 
@@ -198,6 +197,7 @@ void setup() {
 	// Wire.begin(PYRO_SDA, PYRO_SCL);
 
 	Wire.begin(I2C_SDA, I2C_SCL);
+	Wire1.begin(PYRO_SDA, PYRO_SCL, 10000);
 	Serial.println("Initialized SPI");
 
 	// Serial.println("beginning sensor test");
@@ -217,6 +217,7 @@ void setup() {
 	pinMode(BNO086_RESET, OUTPUT);
 	pinMode(CAN_CS, OUTPUT);
 	pinMode(RFM96W_CS, OUTPUT);
+	pinMode(MS5611_CS, OUTPUT);
 	// pinMode(21, OUTPUT);
 	// pinMode(47, OUTPUT);
 // pinMode(41, OUTPUT);
@@ -240,6 +241,29 @@ void setup() {
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, LOW);
     ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+#endif
+
+#ifdef ENABLE_PYRO_MONITOR
+	gpioPinMode(GpioAddress(0,05), OUTPUT);
+	gpioPinMode(GpioAddress(0,04), OUTPUT);
+	gpioPinMode(GpioAddress(0,03), OUTPUT);
+	gpioPinMode(GpioAddress(0,00), OUTPUT);
+	gpioPinMode(GpioAddress(0,01), OUTPUT);
+	for(int i = 0; i < 4; i++){
+	gpioDigitalWrite(GpioAddress(0,05), HIGH);
+	delay(2000);
+	gpioDigitalWrite(GpioAddress(0,05), LOW);
+	delay(2000);
+	gpioDigitalWrite(GpioAddress(0,05), HIGH);
+	}
+
+
+
+	gpioDigitalWrite(GpioAddress(0,04), LOW);
+	gpioDigitalWrite(GpioAddress(0,03), LOW);
+	gpioDigitalWrite(GpioAddress(0,00), LOW);
+	gpioDigitalWrite(GpioAddress(0,01), LOW);
+
 #endif
 
 #ifdef ENABLE_FLASH
@@ -327,7 +351,7 @@ void setup() {
 	// Set Radio TX configuration
 	Radio.SetTxConfig(MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
 					  LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-					  LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+					  LORA_PREAMBLE_LENGTH, false,
 					  true, 0, 0, LORA_IQ_INVERSION_ON, TX_TIMEOUT_VALUE);
 
 	// Set Radio RX configuration
@@ -475,6 +499,10 @@ void setup() {
     	} else {
 			Serial.println("ads init successfully");
 		}
+	#endif
+
+	#ifdef ENABLE_PYRO_MONITOR
+
 	#endif
 
 	#ifdef ENABLE_GPIOEXP
@@ -629,15 +657,15 @@ void setup() {
 	#endif
 }
 int read_reg(int reg, int bytes) {
-    Wire.beginTransmission(0x44);
-    Wire.write(reg);
-    if(Wire.endTransmission()){
+    Wire1.beginTransmission(0x41);
+    Wire1.write(reg);
+    if(Wire1.endTransmission()){
         Serial.println("I2C Error");
     }
-    Wire.requestFrom(0x40, bytes);
+    Wire1.requestFrom(0x41, bytes);
     int val = 0;
     for(int i = 0; i < bytes; i++){
-        int v = Wire.read();
+        int v = Wire1.read();
         if(v == -1) Serial.println("I2C Read Error");
         val = (val << 8) | v;
     }
@@ -648,18 +676,21 @@ int read_reg(int reg, int bytes) {
 void loop() {
 
 	#ifdef ENABLE_PWR_MONITOR
+		static float avg_current = 0.0;
 		int power = read_reg(0x8, 3);
-		int current = read_reg(0x7, 2);
+		int16_t current = read_reg(0x7, 2);
 		int temp = read_reg(0x6, 2);
 		int voltage = read_reg(0x5, 2);
 		Serial.print("Voltage ");
 		Serial.println(voltage * 3.125 / 1000.0);
 		Serial.print("Temp ");
-		Serial.println(temp * 125 / 1000.0);
+		Serial.println((temp>>4) * 125 / 1000.0);
 		Serial.print("Current ");
-		Serial.println(current * 1.2 / 1000.0);
+		Serial.println(current * 1.2 / 1000.0, 5);
 		Serial.print("Power ");
 		Serial.println(power * 240 / 1000000.0);
+		avg_current = avg_current * 0.95 + (current * 1.2 / 1000.0) * 0.05;
+		Serial.println(avg_current / 0.008);
 	#endif
 
 	#ifdef ENABLE_CAN
@@ -951,9 +982,19 @@ void loop() {
 	#ifdef ENABLE_LORA
 
 		Serial.println("Sending LoRa message");
-
-		memcpy(TxdBuffer, PingMsg, sizeof(PingMsg));
-		BufferSize = sizeof(PingMsg);
+		// static bool a = false;
+		// a = !a;
+		static int a = 0;
+		// a = (a + 1) % 16;
+		// if(a){
+			memcpy(TxdBuffer, PingMsg, a);
+		// } else {
+			// memcpy(TxdBuffer, PongMsg, a);
+		// }
+		TxdBuffer[0] = 16;
+		TxdBuffer[(a%15)+1] = 0xff;
+		a++;
+		BufferSize = 16;
 		Radio.Send(TxdBuffer, BufferSize); // Sends the PING
 
 		delay(1000);
@@ -961,6 +1002,6 @@ void loop() {
 	#endif
 
 	// Serial.println("Hello world!");
-	delay(50);
+	delay(100);
 }
 
