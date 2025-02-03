@@ -27,6 +27,9 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
+#include <ACAN2517FD.h>
+#include <ACAN2517FDSettings.h>
+
 #define WAIT_FOR_SERIAL
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
@@ -38,9 +41,9 @@
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
-#define ENABLE_GPS
+// #define ENABLE_GPS
 // #define ENABLE_LORA
-// #define ENABLE_CAN
+#define ENABLE_CAN
 // #define ENABLE_FLASH
 // #define ENABLE_INA
 // #define ENABLE_CHRISTMAS
@@ -93,7 +96,9 @@ MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 
 #endif
 #ifdef ENABLE_CAN
-CANBus CAN(CAN_CS); // Set CS pin
+
+ACAN2517FD can (CAN_CS, SPI, 255) ; // Don't use INT?
+
 #endif
 #define MAX_DATA_SIZE 64
 
@@ -264,22 +269,41 @@ void setup() {
 	file.read((uint8_t*) t, strlen("Hello world"));
 	Serial.println(t);
 #endif
-#ifdef ENABLE_CAN
-    // Serial.println("Starting I2C...");
-	CAN.setSPI(&SPI);
-	while (0 != CAN.begin(CAN_125K_500K))// Initialize CAN BUS with baud rate of 125 kbps and arbitration rate of 500k
-		// This should be in while loop because MCP2518
-		// needs some time to initialize and start function
-		// properly.
-	{
-		Serial.println("CAN init fail, retry..."); // Print information message
-		delay(100);
-	}
-	Serial.println("CAN init ok!");
 
-	for (int i = 0; i < MAX_DATA_SIZE; i++) // Fill buffer with ascending numbers 
-	{
-		stmp[i] = i;
+#ifdef ENABLE_CAN
+
+	Serial.println("CAN: Initializing gpioexp");
+
+	if (!TCAL9539Init()) {
+		Serial.println("Failed to initialize TCAL9539!");
+		// while(1){ };
+	}
+
+	Serial.println("TCAL9539 initialized successfully!");
+
+	for (int i = 0; i <= 017; i++) {
+		gpioPinMode(GpioAddress(2, i), OUTPUT);
+		gpioDigitalWrite(GpioAddress(2, i), LOW);
+	}
+
+	Serial.println("Initializing CAN Controller");
+
+	pinMode(CAN_CS, OUTPUT);
+	gpioPinMode(GpioAddress(2, 01), INPUT); // CAN_INT
+	gpioPinMode(GpioAddress(2, 02), OUTPUT); // CAN_SLNT
+	gpioPinMode(GpioAddress(2, 03), INPUT); // CAN_FAULT
+
+	gpioDigitalWrite(GpioAddress(2, 02), LOW);
+
+	ACAN2517FDSettings can_settings (ACAN2517FDSettings::OSC_40MHz, 125*1000, ACAN2517FDSettings::DATA_BITRATE_x1  );
+	can_settings.mRequestedMode = ACAN2517FDSettings::ExternalLoopBack;
+
+	const uint32_t errorCode = can.begin (can_settings, nullptr) ;
+	if (0 == errorCode) {
+	Serial.println ("Can ok") ;
+	}else{
+	Serial.print ("Error Can: 0b") ;
+	Serial.println (errorCode, BIN) ;
 	}
 #endif
 
@@ -662,27 +686,94 @@ void loop() {
 		Serial.println(power * 240 / 1000000.0);
 	#endif
 
-	#ifdef ENABLE_CAN
-	auto err_code = CAN.sendMsgBuf(0x01, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
-	if (err_code != 0) {
-		Serial.print("Failed: ");
-		Serial.println(err_code);
+    #ifdef ENABLE_CAN
+	can.poll();
+	delay(500);
+
+    Serial.println("Controller phase:");
+      
+
+    CANFDMessage message;
+	message.id = 0x542 ;
+
+	// error: assigning to an array from an initializer list
+	// message.data = {0, 1, 2, 3, 4, 5, 6, 7} ;
+	message.data[0] = 0x01;
+	message.data[1] = 0x23;
+	message.data[2] = 0x45;
+	message.data[3] = 0x67;
+	message.data[4] = 0x89;
+	message.data[5] = 0xAB;
+	message.data[6] = 0xCD;
+	message.data[7] = 0xEF;
+
+	message.len = 8;
+
+	Serial.println("Attempting send");
+	const bool ok = can.tryToSend (message) ;
+	if (ok) {
+	//   gSendDate += 2000 ;
+	//   gSentCount += 1 ;
+	Serial.println ("Sent msg ") ;
+	//   Serial.println (gSentCount) ;
+	//   digitalWrite(LED_GREEN, HIGH);
+	//   delay(50);
+	//   digitalWrite(LED_GREEN, LOW);
 
 	} else {
-		Serial.println("CAN BUS sendMsgBuf ok!"); // Print message
+	Serial.println("FAILED SEND");
+	//   digitalWrite(LED_RED, HIGH);
+	//   delay(50);
+	//   digitalWrite(LED_RED, LOW);
 	}
-	// First parameter - which ID to set in frame (ID of transmitter)
-	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
-	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
-	// Fourth parameter - Buffer which contains data to send
-	// delay(10); // Wait a bit for CAN module to send data
-	// CAN.sendMsgBuf(0x04, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
-	// First parameter - which ID to set in frame (ID of transmitter)
-	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
-	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
-	// Fourth parameter - Buffer which contains data to send
-	delay(1000); // Wait a bit not to overfill network
-	#endif
+
+	delay(500);
+
+
+        // // Diagnostic info
+        // Serial.println("Diag info:");
+        // // Read diag register 0
+
+        // uint32_t diag0 = can.diagInfos(0);
+        // Serial.print("Diag 0: ");
+        // Serial.println(diag0, BIN);
+
+        // // Read diag register 1
+        // uint32_t diag1 = can.diagInfos(1);
+        // Serial.print("Diag 1: ");
+        // Serial.println(diag1, BIN);
+
+      
+	  Serial.println("Attempting recv");
+	  can.poll();
+	  Serial.println("Poll DONE");
+	  if(can.available()) {
+		can.receive (message);
+		Serial.println("CAN Received") ;
+		Serial.printf("%x%x%x%x%x%x%x%x\n", message.data[0], message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+
+	  } else {
+		Serial.println("CAN unavailable");
+	  }
+
+    //   if () {
+    //     Serial.print ("CAN Received: ") ;
+    //     Serial.printf("%d%d%d%d%d%d%d%d\n", message.data[0], message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+    //   }
+
+    //   Serial.println("Transciever phase:");
+
+    //   bool can_fault = digitalRead(CAN_FAULT);
+    //   if(can_fault) {
+    //     Serial.println("CAN Fault");
+    //     digitalWrite(LED_RED, HIGH);
+
+    //   } else {
+    //     digitalWrite(LED_RED, LOW);
+    //   }
+
+
+    #endif
 
 	#ifdef MCU_TEST
 		Serial.println("test");
