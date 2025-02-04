@@ -27,6 +27,8 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
+#include "can_twai.h"
+
 #define WAIT_FOR_SERIAL
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
@@ -38,7 +40,8 @@
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
-#define ENABLE_GPS
+// #define ENABLE_GPS
+#define CAN_TWAI
 // #define ENABLE_LORA
 // #define ENABLE_CAN
 // #define ENABLE_FLASH
@@ -49,6 +52,10 @@
 // Please be careful
 // This will init the gpio expander by itself
 // #define PYRO_TEST
+
+#ifdef CAN_TWAI
+	CANTWAI can;
+#endif
 
 #ifdef ENABLE_LORA
 	hw_config hwConfig;
@@ -215,7 +222,8 @@ void setup() {
 	pinMode(LIS3MDL_CS, OUTPUT);
 	pinMode(BNO086_CS, OUTPUT);
 	pinMode(BNO086_RESET, OUTPUT);
-	pinMode(CAN_CS, OUTPUT);
+	pinMode(CAN_1, OUTPUT);
+	pinMode(CAN_2, INPUT);
 	pinMode(RFM96W_CS, OUTPUT);
 	// pinMode(21, OUTPUT);
 	// pinMode(47, OUTPUT);
@@ -264,6 +272,69 @@ void setup() {
 	file.read((uint8_t*) t, strlen("Hello world"));
 	Serial.println(t);
 #endif
+
+#ifdef CAN_TWAI
+
+	// Initialize configuration structures using macro initializers
+
+	if (!TCAL9539Init()) {
+		Serial.println("Failed to initialize TCAL9539!");
+		// while(1){ };
+	}
+
+	Serial.println("TCAL9539 initialized successfully!");
+
+	for (int i = 0; i <= 017; i++) {
+		gpioPinMode(GpioAddress(2, i), OUTPUT);
+		gpioDigitalWrite(GpioAddress(2, i), LOW);
+	}
+
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
+    ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+
+	gpioPinMode(GpioAddress(2, 02), OUTPUT); // CAN_SLNT
+	gpioPinMode(GpioAddress(2, 03), INPUT);  // CAN_FAULT
+
+	gpioDigitalWrite(GpioAddress(2, 02), LOW); // set CAN_SLNT low to not run in silent mode
+	Serial.println("TCAN pins set");
+
+	twai_mode_t twai_mode = TWAI_MODE_NO_ACK;
+	#ifdef CAN_TWAI_DEMO
+		twai_mode = TWAI_MODE_NORMAL;
+	#endif
+
+	Serial.println("Initializing CAN_TWAI");
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_1, (gpio_num_t)CAN_2, twai_mode);
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
+    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
+    // Install TWAI driver
+    if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
+        Serial.println("Driver installed");
+    } else {
+        Serial.println("Failed to install driver");
+		while (1);
+    }
+
+    // Start TWAI driver
+    if (twai_start() == ESP_OK) {
+        Serial.println("Driver started");
+    } else {
+        Serial.println("Failed to start driver");
+		while (1);
+    }
+
+	uint32_t alerts_to_enable = TWAI_ALERT_ALL;
+	if (twai_reconfigure_alerts(alerts_to_enable, NULL) == ESP_OK) {
+		Serial.print("Alerts reconfigured\n");
+	} else {
+		Serial.print("Failed to reconfigure alerts");
+	}
+
+
+#endif
+
 #ifdef ENABLE_CAN
     // Serial.println("Starting I2C...");
 	CAN.setSPI(&SPI);
@@ -365,6 +436,7 @@ void setup() {
 		KX.setRange(3);
 		Serial.println("highg init successfully");
 	#endif
+
 
 	#ifdef ENABLE_LOWG
 		Serial.println("Before sensor.start");
@@ -662,6 +734,121 @@ void loop() {
 		Serial.println(power * 240 / 1000000.0);
 	#endif
 
+	#ifdef CAN_TWAI
+	delay(100);
+
+	Serial.println("system diag:");
+	twai_status_info_t status_info;
+	if (twai_get_status_info(&status_info) == ESP_OK) {
+		Serial.print("TX Error Counter: ");
+		Serial.println(status_info.tx_error_counter);
+		Serial.print("RX Error Counter: ");
+		Serial.println(status_info.rx_error_counter);
+		Serial.print("Bus status: ");
+		Serial.println(status_info.state);
+	} else {
+		Serial.println("Failed to get TWAI status");
+	}
+
+	Serial.println("alerts:");
+	uint32_t alerts;
+	if (twai_read_alerts(&alerts, pdMS_TO_TICKS(200)) == ESP_OK) {
+		if (alerts & TWAI_ALERT_RX_DATA) {
+			Serial.println("Message available in RX queue");
+		}
+		if (alerts & TWAI_ALERT_TX_FAILED) {
+			Serial.println("Message transmission failed");
+		}
+		if (alerts & TWAI_ALERT_TX_SUCCESS) {
+			Serial.println("TX Success!!");
+		}
+		if (alerts & TWAI_ALERT_BUS_ERROR) {
+			Serial.println("Bus error detected");
+		}
+		if (alerts & TWAI_ALERT_ARB_LOST){
+			Serial.println("Arbitration lost");
+		}
+	}
+
+	Serial.println("TCAN data");
+	bool can_fault = gpioDigitalRead(GpioAddress(2, 03)).value;
+	if(can_fault) {
+		Serial.println("CAN Fault detected!");
+	}
+
+
+	Serial.println("Attempting msg send..");
+
+	twai_message_t message = {
+		.identifier = 0x541,
+		.data_length_code = 5,
+		.data = {77, 73, 68, 65, 83},
+	};
+
+	message.self = 1;
+	message.extd = 0;
+	message.rtr = 0;
+	message.ss = 1;
+	message.dlc_non_comp = 0;
+
+	// Queue message for transmission
+	esp_err_t res = twai_transmit(&message, pdMS_TO_TICKS(200));
+	if (res == ESP_OK) {
+		Serial.println("Message queued for transmission");
+		gpioDigitalWrite(GpioAddress(2, 015), HIGH);
+		ledcWriteTone(BUZZER_CHANNEL, 1500);
+		delay(50);
+		gpioDigitalWrite(GpioAddress(2, 015), LOW);
+		ledcWriteTone(BUZZER_CHANNEL, 0);
+	} else {
+		Serial.println("Failed to queue message for transmission");
+		Serial.println(res, HEX);
+	}
+
+	Serial.println("Recieving:");
+
+	twai_message_t ret_msg;
+	esp_err_t rx_res = twai_receive(&ret_msg, pdMS_TO_TICKS(1000));
+	if (rx_res == ESP_OK) {
+		Serial.print("Message received from CAN bus!\n");
+			
+		gpioDigitalWrite(GpioAddress(2, 014), HIGH);
+		ledcWriteTone(BUZZER_CHANNEL, 3000);
+		delay(50);
+		gpioDigitalWrite(GpioAddress(2, 014), LOW);
+		ledcWriteTone(BUZZER_CHANNEL, 0);
+
+	} else {
+		Serial.print("Failed to receive message: Code ");
+		Serial.println(rx_res, HEX);
+		return;
+	}
+
+	// Process received message
+	if (ret_msg.extd) {
+		Serial.print("Message is in Extended Format\n");
+	} else {
+		Serial.print("Message is in Standard Format\n");
+	}
+	Serial.print("ID is ");
+	Serial.println(ret_msg.identifier, HEX);
+	if (!(ret_msg.rtr)) {
+		for (int i = 0; i < ret_msg.data_length_code; i++) {
+			Serial.print("Data byte ");
+			Serial.print(i);
+			Serial.print(" = ");
+			Serial.println(ret_msg.data[i], HEX);
+		}
+
+		Serial.print("Decoded msg (as char):");
+		for (int i = 0; i < ret_msg.data_length_code; i++) {
+			Serial.print((char)ret_msg.data[i]);
+		}
+		Serial.println("   (EOT)");
+	}
+
+	#endif
+
 	#ifdef ENABLE_CAN
 	auto err_code = CAN.sendMsgBuf(0x01, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
 	if (err_code != 0) {
@@ -682,6 +869,73 @@ void loop() {
 	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
 	// Fourth parameter - Buffer which contains data to send
 	delay(1000); // Wait a bit not to overfill network
+	#endif
+
+	#ifdef CAN_TWAI_2
+
+		twai_status_info_t status;
+		twai_get_status_info(&status);
+		Serial.print("TX Errors: "); Serial.println(status.tx_error_counter);
+		Serial.print("RX Errors: "); Serial.println(status.rx_error_counter);
+		Serial.print("State: "); Serial.println(status.state);
+
+		//Configure message to transmit
+		twai_message_t message = {
+			.flags = TWAI_MSG_FLAG_SELF,
+			.identifier = 0x123, 
+			.data_length_code = 8, 
+			.data = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
+		};
+
+		//Queue message for transmission
+		if (twai_transmit(&message, pdMS_TO_TICKS(1000)) == ESP_OK) {
+			printf("Message queued for transmission\n");
+		} else {
+			printf("Failed to queue message for transmission\n");
+		}
+
+		twai_message_t received_message;
+		if (twai_receive(&received_message, pdMS_TO_TICKS(1000)) == ESP_OK) {
+			printf("Message received with ID: 0x%X\n", received_message.identifier);
+		} else {
+			printf("Reception failed\n");
+		}
+
+		// twai_message_t recvmsg;
+
+
+		// twai_message_t m{
+		// 	.flags = TWAI_MSG_FLAG_SELF,
+		// 	.identifier = 0x321,
+		// 	.data_length_code = 4,
+		// 	.data = {0, 1, 2, 3},
+		// };
+
+		// Serial.println("Attempting CAN send");
+		// if(can.send(m)) {
+		// 	Serial.println("Sent msg");
+		// }
+
+		// if(can.recv(&recvmsg)) {
+		// 	Serial.println("CAN Recv: ");
+
+		// 	Serial.print(recvmsg.identifier, HEX);
+		// 	Serial.print("  ");
+		// 	Serial.print(recvmsg.data_length_code);
+		// 	Serial.print(":  ");
+		// 	for(unsigned i = 0; i < recvmsg.data_length_code; i++) {
+		// 		Serial.print(recvmsg.data[i]);
+		// 	}
+		// 	Serial.println("  <EOM>");
+		// }
+
+
+		Serial.println("TXR phase:");
+		if(gpioDigitalRead(GpioAddress(02, 03)).value) {
+			Serial.println("CAN FAULT!");
+		}
+		
+		delay(1000);
 	#endif
 
 	#ifdef MCU_TEST

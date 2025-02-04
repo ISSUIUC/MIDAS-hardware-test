@@ -56,6 +56,9 @@
 #define E22_RXEN 7
 #define E22_RESET 8
 
+#define CAN_1 2
+#define CAN_2 1
+
 #define INA745_ADDR 0x44
 
 #define PYRO_SDA 41
