@@ -70,13 +70,18 @@ bool RH_SX126x::init()
 	return false;
 
     
+
     // No way to check the device type :-(
     // Can read data like 'SX1261 TKF 1A11', at register 0x0320 RH_SX126x_REG_VERSION_STRING but it does not change for SX1261
     
     // Get the current status and guess if we are connected
     uint8_t status = getStatus();
+    Serial.print("LORA init status 0x");
+    Serial.println(status, HEX);
     if (status == 0x00 || status == 0xff) // Should never get this: probably not connected by SPI
         return false;
+
+    Serial.println("Got LORA SPI connection!");
 
     setModeIdle();
     setRegulatorMode(RH_SX126x_REGULATOR_DC_DC); // == SMPS mode
@@ -86,7 +91,7 @@ bool RH_SX126x::init()
     // This LoRa Sync word 0x1424 is compatible with single byte 0x12 default for RH_RF95.
     // https://forum.lora-developers.semtech.com/t/sx1272-and-sx1262-lora-sync-word-compatibility/988/13
     setLoRaSyncWord(0x1424); 
-    setDIO2AsRfSwitchCtrl(false); // Dont use DIO2 as RF control for Wio-E5, which uses separate pins
+    setDIO2AsRfSwitchCtrl(true); // IMPORTANT: This must be set TRUE for the E22 Ebyte module!
     setTCXO(1.7, 5000); // MUST do this (in standby mode) else get no output. volts, us
     // These are the interrupts we are willing to pocess
     uint16_t interrupts =

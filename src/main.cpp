@@ -25,7 +25,21 @@
 #include <Adafruit_BNO08x.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
-#include <LoRaWan-Arduino.h>
+#include <SX126x-Arduino.h>
+
+// #include <RH_SX126x.h>
+// #include <RHSoftwareSPI.h>
+// #include <RHGenericSPI.h>
+
+#include <SX126XLT.h>
+
+#include <ACAN2517FD.h>
+#include <ACAN2517FDSettings.h>
+#include "driver/gpio.h"
+#include "driver/twai.h"
+#include <ACAN_ESP32.h>
+
+#include <buzzer.h>
 
 #define WAIT_FOR_SERIAL
 // #define MCU_TEST
@@ -40,15 +54,28 @@
 // #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
+// #define ENABLE_LORA_RH
 // #define ENABLE_CAN
+#define ENABLE_CAN_TWAI
+// #define CAN_TWAI_DEMO
+// #define ENABLE_CAN_ESP32
 // #define ENABLE_FLASH
 // #define ENABLE_INA
 // #define ENABLE_CHRISTMAS
-#define ENABLE_PWR_MONITOR
+// #define ENABLE_PWR_MONITOR
 
 // Please be careful
 // This will init the gpio expander by itself
 // #define PYRO_TEST
+
+#ifdef CAN_TWAI_DEMO
+	int twai_demo_state = 0; // 0 = search
+	                         // 1 = playing
+#endif
+
+#ifdef ENABLE_CAN
+	ACAN2517FD can (CAN_CS, SPI, 255) ; // You can use SPI2, SPI3, if provided by your microcontroller
+#endif
 
 #ifdef ENABLE_LORA
 	hw_config hwConfig;
@@ -92,9 +119,7 @@ MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 #ifdef ENABLE_INA
 
 #endif
-#ifdef ENABLE_CAN
-CANBus CAN(CAN_CS); // Set CS pin
-#endif
+
 #define MAX_DATA_SIZE 64
 
 #ifdef PYRO_TEST
@@ -102,14 +127,30 @@ CANBus CAN(CAN_CS); // Set CS pin
 
 #endif
 
+#ifdef ENABLE_LORA_RH
+
+
+// #define E22_CS 5
+// #define E22_DI01 4
+// #define E22_DI03 3
+// #define E22_BUSY 6
+// #define E22_RXEN 7
+// #define E22_RESET 8
+
+
+uint8_t txbuf[] = "Hello From MIDAS!";
+SX126XLT modem;
+
+#endif
+
 
 #ifdef ENABLE_LORA
 
-#define RF_FREQUENCY 430000000  // Hz
+#define RF_FREQUENCY 434000000  // Hz
 #define TX_OUTPUT_POWER 22		// dBm
 #define LORA_BANDWIDTH 0		// [0: 125 kHz, 1: 250 kHz, 2: 500 kHz, 3: Reserved]
-#define LORA_SPREADING_FACTOR 8 // [SF7..SF12]
-#define LORA_CODINGRATE 4		// [1: 4/5, 2: 4/6,  3: 4/7,  4: 4/8]
+#define LORA_SPREADING_FACTOR 7 // [SF7..SF12]
+#define LORA_CODINGRATE 1		// [1: 4/5, 2: 4/6,  3: 4/7,  4: 4/8]
 #define LORA_PREAMBLE_LENGTH 8  // Same for Tx and Rx
 #define LORA_SYMBOL_TIMEOUT 0   // Symbols
 #define LORA_FIX_LENGTH_PAYLOAD_ON false
@@ -129,7 +170,6 @@ static RadioEvents_t RadioEvents;
 static uint16_t BufferSize = LORA_BUFFER_SIZE;
 static uint8_t RcvBuffer[LORA_BUFFER_SIZE];
 static uint8_t TxdBuffer[LORA_BUFFER_SIZE];
-static bool isMaster = true;
 const uint8_t PingMsg[] = "PING";
 const uint8_t PongMsg[] = "PONG";
 
@@ -176,7 +216,7 @@ void OnCadDone(bool cadResult)
 
 #ifdef ENABLE_CHRISTMAS
 // I wanted to be cute
-#include <buzzer.h>
+
 
 bool cur_light_state = false;
 
@@ -185,20 +225,26 @@ bool cur_light_state = false;
 void setup() {
 	Serial.begin(9600);
 
-
 	#ifdef WAIT_FOR_SERIAL
 		while(!Serial);
 		Serial.println("Serial ready");
 	#endif
 
+	delay(500);
 
-	delay(1000);
-
-    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+	#ifdef ENABLE_CAN
+		SPI.begin(SPI_SCK, SPI_MOSI, SPI_MISO);
+	#else
+		SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+	#endif
+    
 	// Wire.begin(PYRO_SDA, PYRO_SCL);
+	Serial.println("Initialized SPI");
 
 	Wire.begin(I2C_SDA, I2C_SCL);
-	Serial.println("Initialized SPI");
+	Serial.println("Initialized I2C");
+	
+	
 
 	// Serial.println("beginning sensor test");
 	
@@ -236,6 +282,99 @@ void setup() {
 
 	digitalWrite(BNO086_RESET, LOW);
 
+#ifdef ENABLE_LORA_RH
+
+	Serial.println("Initializing lora");
+
+	if(!modem.begin(E22_CS, E22_RESET, E22_BUSY, E22_DI01, E22_RXEN, -1, DEVICE_SX1268)) {
+
+		Serial.println("Unable to init modem..");
+		while(1);
+	}
+
+	Serial.println("Setting lora settings");
+	modem.setupLoRa(434000000, 0, LORA_SF8, LORA_BW_125, LORA_CR_4_8, LDRO_OFF);
+	modem.setDIO2AsRfSwitchCtrl();
+
+	Serial.println("Lora initialized!");
+
+	Serial.println("Modem Operation:");
+	modem.printModemSettings();                               //reads and prints the configured LoRa settings, useful check
+	Serial.println();
+	modem.printOperatingSettings();                           //reads and prints the configured operating settings, useful check
+	Serial.println();
+	Serial.println();
+	modem.printRegisters(0x900, 0x9FF);                       //print contents of device registers, normally 0x00 to 0x4F
+	Serial.println();
+	Serial.println();
+
+	Serial.print(F("Transmitter ready"));
+	Serial.println();
+
+
+#endif
+
+
+#ifdef ENABLE_CAN_TWAI
+	    // Initialize configuration structures using macro initializers
+
+	if (!TCAL9539Init()) {
+		Serial.println("Failed to initialize TCAL9539!");
+		// while(1){ };
+	}
+
+	Serial.println("TCAL9539 initialized successfully!");
+
+	for (int i = 0; i <= 017; i++) {
+		gpioPinMode(GpioAddress(2, i), OUTPUT);
+		gpioDigitalWrite(GpioAddress(2, i), LOW);
+	}
+
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
+    ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+
+	gpioPinMode(GpioAddress(2, 02), OUTPUT); // CAN_SLNT
+	gpioPinMode(GpioAddress(2, 03), INPUT);  // CAN_FAULT
+
+	gpioDigitalWrite(GpioAddress(2, 02), LOW); // set CAN_SLNT low to not run in silent mode
+	Serial.println("TCAN pins set");
+
+	twai_mode_t twai_mode = TWAI_MODE_NO_ACK;
+	#ifdef CAN_TWAI_DEMO
+		twai_mode = TWAI_MODE_NORMAL;
+	#endif
+
+	Serial.println("Initializing CAN_TWAI");
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_1, (gpio_num_t)CAN_2, twai_mode);
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
+    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
+    // Install TWAI driver
+    if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
+        Serial.println("Driver installed");
+    } else {
+        Serial.println("Failed to install driver");
+		while (1);
+    }
+
+    // Start TWAI driver
+    if (twai_start() == ESP_OK) {
+        Serial.println("Driver started");
+    } else {
+        Serial.println("Failed to start driver");
+		while (1);
+    }
+
+	uint32_t alerts_to_enable = TWAI_ALERT_ALL;
+	if (twai_reconfigure_alerts(alerts_to_enable, NULL) == ESP_OK) {
+		Serial.print("Alerts reconfigured\n");
+	} else {
+		Serial.print("Failed to reconfigure alerts");
+	}
+#endif
+
+
 #ifdef ENABLE_CHRISTMAS
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, LOW);
@@ -264,30 +403,37 @@ void setup() {
 	file.read((uint8_t*) t, strlen("Hello world"));
 	Serial.println(t);
 #endif
-#ifdef ENABLE_CAN
-    // Serial.println("Starting I2C...");
-	CAN.setSPI(&SPI);
-	while (0 != CAN.begin(CAN_125K_500K))// Initialize CAN BUS with baud rate of 125 kbps and arbitration rate of 500k
-		// This should be in while loop because MCP2518
-		// needs some time to initialize and start function
-		// properly.
-	{
-		Serial.println("CAN init fail, retry..."); // Print information message
-		delay(100);
-	}
-	Serial.println("CAN init ok!");
 
-	for (int i = 0; i < MAX_DATA_SIZE; i++) // Fill buffer with ascending numbers 
-	{
-		stmp[i] = i;
-	}
+#ifdef ENABLE_CAN
+      Serial.println("Initializing CAN Controller");
+
+      pinMode(CAN_CS, OUTPUT);
+
+	  gpioPinMode(GpioAddress(2, 00), INPUT); // NINT1
+	  gpioPinMode(GpioAddress(2, 01), INPUT); // NINT
+	  gpioPinMode(GpioAddress(2, 02), OUTPUT);// SLNT
+	  gpioPinMode(GpioAddress(2, 03), INPUT); // FAULT
+
+	  gpioDigitalWrite(GpioAddress(2, 02), LOW); // Set SLNT to low
+
+      ACAN2517FDSettings can_settings (ACAN2517FDSettings::OSC_40MHz, 125*1000, DataBitRateFactor::x1  );
+      can_settings.mRequestedMode = ACAN2517FDSettings::ExternalLoopBack;
+      
+
+      const uint32_t errorCode = can.begin (can_settings, [] { can.isr () ; }) ;
+      if (0 == errorCode) {
+        Serial.println ("Can ok") ;
+      }else{
+        Serial.print ("Error Can: 0x") ;
+        Serial.println (errorCode, HEX) ;
+      }
 #endif
 
 #ifdef ENABLE_LORA
 
 	Serial.println("Initializing LoRa");
 
-	hwConfig.CHIP_TYPE = SX1262_CHIP;		  // Example uses an eByte E22 module with an SX1262
+	hwConfig.CHIP_TYPE = SX1268_CHIP;		  // Example uses an eByte E22 module with an SX1262
 	hwConfig.PIN_LORA_RESET = E22_RESET; // LORA RESET
 	hwConfig.PIN_LORA_NSS = E22_CS;	  // LORA SPI CS
 	hwConfig.PIN_LORA_SCLK = SPI_SCK;	  // LORA SPI CLK
@@ -296,8 +442,10 @@ void setup() {
 	hwConfig.PIN_LORA_BUSY = E22_BUSY;	  // LORA SPI BUSY
 	hwConfig.PIN_LORA_MOSI = SPI_MOSI;	  // LORA SPI MOSI
 	hwConfig.RADIO_RXEN = E22_RXEN;		  // LORA ANTENNA RX ENABLE
-	hwConfig.USE_DIO2_ANT_SWITCH = true;	  // Example uses an CircuitRocks Alora RFM1262 which uses DIO2 pins as antenna control
-	hwConfig.USE_DIO3_TCXO = false;			  // Example uses an CircuitRocks Alora RFM1262 which uses DIO3 to control oscillator voltage
+	hwConfig.RADIO_TXEN = -1;
+	hwConfig.USE_DIO2_ANT_SWITCH = true;
+	hwConfig.USE_DIO3_TCXO = false;
+	hwConfig.USE_DIO3_ANT_SWITCH = false;
 
 	Serial.println("LoRa config set");
 
@@ -317,6 +465,8 @@ void setup() {
 	RadioEvents.CadDone = OnCadDone;
 	Serial.println("Lora callbacks set");
 
+	lora_set_syncword(0x12);
+
 	// Initialize the Radio
 	Radio.Init(&RadioEvents);
 
@@ -329,6 +479,8 @@ void setup() {
 					  LORA_SPREADING_FACTOR, LORA_CODINGRATE,
 					  LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
 					  true, 0, 0, LORA_IQ_INVERSION_ON, TX_TIMEOUT_VALUE);
+
+
 
 	// Set Radio RX configuration
 	Radio.SetRxConfig(MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
@@ -663,30 +815,16 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_CAN
-	auto err_code = CAN.sendMsgBuf(0x01, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
-	if (err_code != 0) {
-		Serial.print("Failed: ");
-		Serial.println(err_code);
 
-	} else {
-		Serial.println("CAN BUS sendMsgBuf ok!"); // Print message
-	}
-	// First parameter - which ID to set in frame (ID of transmitter)
-	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
-	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
-	// Fourth parameter - Buffer which contains data to send
-	// delay(10); // Wait a bit for CAN module to send data
-	// CAN.sendMsgBuf(0x04, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
-	// First parameter - which ID to set in frame (ID of transmitter)
-	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
-	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
-	// Fourth parameter - Buffer which contains data to send
+	
+
 	delay(1000); // Wait a bit not to overfill network
 	#endif
 
 	#ifdef MCU_TEST
 		Serial.println("test");
 	#endif
+
 
 	#ifdef ENABLE_CHRISTMAS
 		// just play the entire song
@@ -711,6 +849,32 @@ void loop() {
 		Serial.println("Delaying 2s before playing again");
 		delay(2000);
 		
+
+	#endif
+
+	#ifdef ENABLE_LORA_RH
+
+		uint8_t TXPacketL = sizeof(txbuf);                                    //set TXPacketL to length of array
+		uint8_t txp = 20;
+
+		
+		Serial.println("Reading txbuffer..");
+		modem.printASCIIPacket(txbuf, TXPacketL);                        //print the buffer (the sent packet) as ASCII           
+		Serial.println();
+		Serial.println("Enqueuing packet for lora send..");
+		if (modem.transmit(txbuf, TXPacketL, 10, txp, WAIT_TX))   //will return packet length sent if OK, otherwise 0 if transmit error
+		{
+			Serial.print("Send OK.. sent at ");
+			Serial.print(txp);
+			Serial.println(" dbm");
+		}
+		else
+		{
+			Serial.println("Packet send err");                                 //transmit packet returned 0, there was an error
+		}
+
+		Serial.println();
+		delay(1000);                                 //have a delay between packets
 
 	#endif
 
@@ -827,6 +991,196 @@ void loop() {
 		Serial.print(" Altitude: ");
 		Serial.println(altitude);
 	#endif
+
+#ifdef ENABLE_CAN_TWAI
+	// Configure message to transmit
+	#ifndef CAN_TWAI_DEMO
+	delay(1000);
+
+	Serial.println("system diag:");
+	twai_status_info_t status_info;
+	if (twai_get_status_info(&status_info) == ESP_OK) {
+		Serial.print("TX Error Counter: ");
+		Serial.println(status_info.tx_error_counter);
+		Serial.print("RX Error Counter: ");
+		Serial.println(status_info.rx_error_counter);
+		Serial.print("Bus status: ");
+		Serial.println(status_info.state);
+	} else {
+		Serial.println("Failed to get TWAI status");
+	}
+
+	Serial.println("alerts:");
+	uint32_t alerts;
+	if (twai_read_alerts(&alerts, pdMS_TO_TICKS(200)) == ESP_OK) {
+		if (alerts & TWAI_ALERT_RX_DATA) {
+			Serial.println("Message available in RX queue");
+		}
+		if (alerts & TWAI_ALERT_TX_FAILED) {
+			Serial.println("Message transmission failed");
+		}
+		if (alerts & TWAI_ALERT_TX_SUCCESS) {
+			Serial.println("TX Success!!");
+		}
+		if (alerts & TWAI_ALERT_BUS_ERROR) {
+			Serial.println("Bus error detected");
+		}
+		if (alerts & TWAI_ALERT_ARB_LOST){
+			Serial.println("Arbitration lost");
+		}
+	}
+
+	Serial.println("TCAN data");
+	bool can_fault = gpioDigitalRead(GpioAddress(2, 03)).value;
+	if(can_fault) {
+		Serial.println("CAN Fault detected!");
+	}
+
+
+	Serial.println("Attempting msg send..");
+
+	twai_message_t message = {
+		.identifier = 0x541,
+		.data_length_code = 5,
+		.data = {77, 73, 68, 65, 83},
+	};
+
+	message.self = 1;
+	message.extd = 0;
+	message.rtr = 0;
+	message.ss = 1;
+	message.dlc_non_comp = 0;
+
+	// Queue message for transmission
+	esp_err_t res = twai_transmit(&message, pdMS_TO_TICKS(200));
+	if (res == ESP_OK) {
+		Serial.println("Message queued for transmission");
+		gpioDigitalWrite(GpioAddress(2, 015), HIGH);
+		ledcWriteTone(BUZZER_CHANNEL, 1500);
+		delay(50);
+		gpioDigitalWrite(GpioAddress(2, 015), LOW);
+		ledcWriteTone(BUZZER_CHANNEL, 0);
+	} else {
+		Serial.println("Failed to queue message for transmission");
+		Serial.println(res, HEX);
+	}
+
+	Serial.println("Recieving:");
+
+	twai_message_t ret_msg;
+	esp_err_t rx_res = twai_receive(&ret_msg, pdMS_TO_TICKS(1000));
+	if (rx_res == ESP_OK) {
+		Serial.print("Message received from CAN bus!\n");
+			
+		gpioDigitalWrite(GpioAddress(2, 014), HIGH);
+		ledcWriteTone(BUZZER_CHANNEL, 3000);
+		delay(50);
+		gpioDigitalWrite(GpioAddress(2, 014), LOW);
+		ledcWriteTone(BUZZER_CHANNEL, 0);
+
+	} else {
+		Serial.print("Failed to receive message: Code ");
+		Serial.println(rx_res, HEX);
+		return;
+	}
+
+	// Process received message
+	if (ret_msg.extd) {
+		Serial.print("Message is in Extended Format\n");
+	} else {
+		Serial.print("Message is in Standard Format\n");
+	}
+	Serial.print("ID is ");
+	Serial.println(ret_msg.identifier, HEX);
+	if (!(ret_msg.rtr)) {
+		for (int i = 0; i < ret_msg.data_length_code; i++) {
+			Serial.print("Data byte ");
+			Serial.print(i);
+			Serial.print(" = ");
+			Serial.println(ret_msg.data[i], HEX);
+		}
+
+		Serial.print("Decoded msg (as char):");
+		for (int i = 0; i < ret_msg.data_length_code; i++) {
+			Serial.print((char)ret_msg.data[i]);
+		}
+		Serial.println("   (EOT)");
+	}
+
+	#endif
+
+	#ifdef CAN_TWAI_DEMO
+		if(twai_demo_state == 0) {
+			Serial.println("Polling CAN...");
+			bool msg_recv = false;
+
+			twai_message_t message = {
+				.identifier = 0x100,
+				.data_length_code = 1,
+				.data = {1}, // Song sync -- Corresponds to which sound to sync
+			};
+
+			message.self = 1;
+			message.extd = 0;
+			message.rtr = 0;
+			message.ss = 1;
+			message.dlc_non_comp = 0;
+
+			esp_err_t res = twai_transmit(&message, pdMS_TO_TICKS(50));
+			if (res == ESP_OK) {
+				Serial.println("CAN Poll Queued");
+				twai_demo_state = 1;
+				gpioDigitalWrite(GpioAddress(2, 015), HIGH);
+				ledcWriteTone(BUZZER_CHANNEL, 1500);
+				delay(50);
+				gpioDigitalWrite(GpioAddress(2, 015), LOW);
+				ledcWriteTone(BUZZER_CHANNEL, 0);
+			} else {
+				Serial.println("Failed to queue message for transmission");
+				Serial.println(res, HEX);
+			}
+		}
+
+		twai_message_t ret_msg;
+		esp_err_t rx_res = twai_receive(&ret_msg, pdMS_TO_TICKS(500));
+		if (rx_res == ESP_OK) {
+			Serial.print("Msg recieved...\n");
+
+
+			if(ret_msg.identifier == 0x200 && ret_msg.data[0] == 1) {
+				twai_demo_state = 0;
+				gpioDigitalWrite(GpioAddress(2, 014), HIGH);
+				ledcWriteTone(BUZZER_CHANNEL, 3000);
+				delay(50);
+				gpioDigitalWrite(GpioAddress(2, 014), LOW);
+				ledcWriteTone(BUZZER_CHANNEL, 0);
+
+				// do the sequence :D
+
+				delay(1000);
+
+				gpioDigitalWrite(GpioAddress(2, 017), HIGH);
+				for(unsigned i = 0; i < MERRY_CHRISTMAS_LENGTH; i++) {
+
+					Sound cur_sound = merry_christmas[i];
+					ledcWriteTone(BUZZER_CHANNEL, cur_sound.frequency);
+					delay(cur_sound.duration_ms);
+				}
+				gpioDigitalWrite(GpioAddress(2, 017), LOW);
+
+				delay(2000);
+
+			} else {
+				Serial.println("Recieved own msg");
+			}
+		} else {
+			Serial.print("Failed to receive message: Code ");
+			Serial.println(rx_res, HEX);
+		}
+
+	#endif
+
+#endif
 
 	#ifdef ENABLE_HIGHG
 		auto data = KX.getAccelData();
@@ -955,6 +1309,12 @@ void loop() {
 		memcpy(TxdBuffer, PingMsg, sizeof(PingMsg));
 		BufferSize = sizeof(PingMsg);
 		Radio.Send(TxdBuffer, BufferSize); // Sends the PING
+
+		Serial.println("Debug:");
+
+
+		Serial.print("Syncword (2): ");
+		Serial.println(lora_read_syncword(), HEX);
 
 		delay(1000);
 

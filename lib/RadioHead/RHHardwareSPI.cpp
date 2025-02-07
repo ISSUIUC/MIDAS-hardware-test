@@ -139,7 +139,8 @@ void RHHardwareSPI::begin()
 
     // Save the settings for use in transactions
    _settings = SPISettings(frequency, bitOrder, dataMode);
-   SPI.begin();
+   Serial.println("Begin hw_spi with correct spi pins");
+   SPI.begin(38, 39, 37);
     
 #else // SPI_HAS_TRANSACTION
     

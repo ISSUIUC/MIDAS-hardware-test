@@ -35,6 +35,8 @@
 
 // CAN pins
 #define CAN_CS 2
+#define CAN_1 2
+#define CAN_2 1
 #define RFM96W_CS 5
 
 // GPS I2C location
