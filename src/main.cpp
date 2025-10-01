@@ -48,6 +48,7 @@
 
 // Please be careful
 // This will init the gpio expander by itself
+// Pyro test requires Pyro I2C (may need to change in setup)
 // #define PYRO_TEST
 
 #ifdef ENABLE_LORA
