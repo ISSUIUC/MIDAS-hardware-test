@@ -27,7 +27,12 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
+#include <lsm6dsv320x_reg.c>
+
 #define WAIT_FOR_SERIAL
+
+#define ENABLE_IMU
+
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
 // #define ENABLE_HIGHG
@@ -49,6 +54,12 @@
 // Please be careful
 // This will init the gpio expander by itself
 // #define PYRO_TEST
+
+// I'm assuming this is where that one class struct will go
+// Default configuration of the IMU
+#ifdef ENABLE_IMU
+
+#endif
 
 #ifdef ENABLE_LORA
 	hw_config hwConfig;
