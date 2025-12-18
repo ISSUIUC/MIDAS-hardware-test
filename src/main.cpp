@@ -344,41 +344,13 @@ void setup() {
 
 		else { Serial.println("IMU ID get."); }
 
-		int16_t raw_accel[3];
-		int16_t raw_accel_hg[3];
-		int16_t raw_ar[3];
-
 		// the second parameter used to be normal instead of high-performance
 		LSM6DSV.xl_setup(LSM6DSV320X_ODR_AT_7Hz5, LSM6DSV320X_XL_HIGH_PERFORMANCE_MD);
    		LSM6DSV.gy_setup(LSM6DSV320X_ODR_AT_15Hz, LSM6DSV320X_GY_HIGH_PERFORMANCE_MD);
 
-		LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);
+		// LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);
     	LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
 
-		while(1) {
-			lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
-
-			if(status.gda) {
-				LSM6DSV.acceleration_raw_get(raw_accel);
-				Serial.printf("LowG Acceleration \n\nX: ", LSM6DSV.from_fs2_to_mg(raw_accel[0]), "\nY: ", LSM6DSV.from_fs2_to_mg(raw_accel[1]), "\nZ: ", LSM6DSV.from_fs2_to_mg(raw_accel[2]));
-			}
-			
-			delay(500);
-
-			if(status.xlhgda) {
-				LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
-				Serial.printf("HighG Acceleration \n\nX: ", LSM6DSV.from_fs2_to_mg(raw_accel_hg[0]), "\nY: ", LSM6DSV.from_fs2_to_mg(raw_accel_hg[1]), "\nZ: ", LSM6DSV.from_fs2_to_mg(raw_accel_hg[2]), "\n");
-			}
-
-			delay(500);		
-			
-			if(status.gda) {
-				LSM6DSV.angular_rate_raw_get(raw_ar);
-				Serial.printf("Angular Rate\n\nX: ", LSM6DSV.from_fs2000_to_mdps(raw_ar[0]), "\nY: ", LSM6DSV.from_fs2000_to_mdps(raw_ar[1]), "\nZ: ", LSM6DSV.from_fs2000_to_mdps(raw_ar[2]), "\n");
-			}
-
-			delay(500);
-		}
 
 	#endif
 
@@ -768,6 +740,30 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_IMU
+
+		int16_t raw_accel[3];
+		int16_t raw_accel_hg[3];
+		int16_t raw_ar[3];
+
+		lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
+
+		if(status.gda) {
+			LSM6DSV.acceleration_raw_get(raw_accel);
+			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
+		}
+
+		if(status.xlhgda) {
+			LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
+			Serial.printf("HighG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel_hg[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[2])/1000);
+		}	
+		
+		if(status.gda) {
+			LSM6DSV.angular_rate_raw_get(raw_ar);
+			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
+		}
+
+
+	// OLD LSM6DSL CODE
 	/*
 		float ax, ay, az, gx, gy, gz;
 		LSM.readAcceleration(ax, ay, az);
