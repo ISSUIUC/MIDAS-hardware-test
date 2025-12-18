@@ -21,20 +21,17 @@
 #include <SparkFun_Qwiic_KX13X.h>
 #include <PL_ADXL355.h>
 #include <Arduino_LSM6DS3.h>
-#include <Adafruit_LIS3MDL.h>
+#include <SparkFun_MMC5983MA_Arduino_Library.h>
 #include <Adafruit_BNO08x.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
 #define WAIT_FOR_SERIAL
-#define MCU_TEST
+// #define MCU_TEST
 // #define ENABLE_BAROMETER
-// #define ENABLE_HIGHG
-// #define ENABLE_LOWG
-// #define ENABLE_LOWGLSM
-// #define ENABLE_MAGNETOMETER
-// #define ENABLE_ORIENTATION
+// #define ENABLE_IMU
+#define ENABLE_MAGNETOMETER
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
@@ -72,7 +69,7 @@
 #endif
 
 #ifdef ENABLE_MAGNETOMETER
-	Adafruit_LIS3MDL LIS3MDL;
+	SFE_MMC5983MA MMC5983;
 #endif
 
 #ifdef ENABLE_ORIENTATION
@@ -341,14 +338,30 @@ void setup() {
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
-		if (!LIS3MDL.begin_SPI(LIS3MDL_CS)){
-			Serial.println("could not init magnetometer");
-			while(1);
+		// // if (!LIS3MDL.begin_SPI(LIS3MDL_CS)){
+		// // 	Serial.println("could not init magnetometer");
+		// // 	while(1);
+		// // }
+		// // LIS3MDL.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+		// // LIS3MDL.setDataRate(LIS3MDL_DATARATE_5_HZ);
+		// // LIS3MDL.setRange(LIS3MDL_RANGE_4_GAUSS);
+		// // Serial.println("magnetometer init successfully");
+
+		while(MMC5983.begin(MMC5983_CS) == false) {
+			Serial.println("Mag init failed");
+			delay(200);
+			MMC5983.softReset();
+			delay(200);
+
 		}
-		LIS3MDL.setOperationMode(LIS3MDL_CONTINUOUSMODE);
-		LIS3MDL.setDataRate(LIS3MDL_DATARATE_5_HZ);
-		LIS3MDL.setRange(LIS3MDL_RANGE_4_GAUSS);
-		Serial.println("magnetometer init successfully");
+
+		// sanity check
+		int t = MMC5983.getTemperature();
+		Serial.print("Reported die temp: ");
+		Serial.print(t);
+		Serial.println("C");
+
+
 	#endif
 
 	#ifdef ENABLE_EMMC
@@ -729,16 +742,22 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
-		LIS3MDL.read();
-		float mx = LIS3MDL.x_gauss;
-		float my = LIS3MDL.y_gauss;
-		float mz = LIS3MDL.z_gauss;
-		Serial.print("mx: ");
-		Serial.print(mx);
-		Serial.print(" my: ");
-		Serial.print(my);
-		Serial.print(" mz: ");
-		Serial.println(mz);
+		// LIS3MDL.read();
+		// float mx = LIS3MDL.x_gauss;
+		// float my = LIS3MDL.y_gauss;
+		// float mz = LIS3MDL.z_gauss;
+		// Serial.print("mx: ");
+		// Serial.print(mx);
+		// Serial.print(" my: ");
+		// Serial.print(my);
+		// Serial.print(" mz: ");
+		// Serial.println(mz);
+		uint32_t cx, cy, cz;
+		double X, Y, Z;
+
+		MMC5983.getMeasurementXYZ(&cx, &dy, &cz);
+		
+
 	#endif
 
 	#ifdef ENABLE_ADS
