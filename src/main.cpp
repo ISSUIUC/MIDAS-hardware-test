@@ -27,16 +27,14 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
-#include <lsm6dsv320x_reg.c>
+#include <lsm6dsv320x.h>
 
 #define WAIT_FOR_SERIAL
 
-#define ENABLE_IMU
-
 // #define MCU_TEST
-// #define ENABLE_BAROMETER
-// #define ENABLE_IMU
-#define ENABLE_MAGNETOMETER
+//#define ENABLE_BAROMETER
+ #define ENABLE_IMU
+// #define ENABLE_MAGNETOMETER
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
@@ -53,10 +51,8 @@
 // Pyro test requires Pyro I2C (may need to change in setup)
 // #define PYRO_TEST
 
-// I'm assuming this is where that one class struct will go
-// Default configuration of the IMU
 #ifdef ENABLE_IMU
-
+	LSM6DSV320XClass LSM6DSV(SPI, LSM6DSV320X_CS, LSM_INT1);
 #endif
 
 #ifdef ENABLE_LORA
@@ -76,7 +72,7 @@
 #endif
 
 #ifdef ENABLE_LOWGLSM
-	LSM6DS3Class LSM(SPI, LSM6DS3_CS, 46);
+	LSM6DSV320XClass LSM(SPI, LSM6DS3_CS, 46);
 #endif
 
 #ifdef ENABLE_MAGNETOMETER
@@ -341,11 +337,49 @@ void setup() {
 	#endif
 
 	#ifdef ENABLE_IMU
-		if (!LSM.begin()) {
-			Serial.println("could not init lowglsm");
-			while(1);
+
+		uint8_t whoami;
+		LSM6DSV.device_id_get(&whoami);
+		if(whoami != LSM6DSV320X_ID) { Serial.println("IMU Error. Cannot get the ID."); }
+
+		else { Serial.println("IMU ID get."); }
+
+		int16_t raw_accel[3];
+		int16_t raw_accel_hg[3];
+		int16_t raw_ar[3];
+
+		// the second parameter used to be normal instead of high-performance
+		LSM6DSV.xl_setup(LSM6DSV320X_ODR_AT_7Hz5, LSM6DSV320X_XL_HIGH_PERFORMANCE_MD);
+   		LSM6DSV.gy_setup(LSM6DSV320X_ODR_AT_15Hz, LSM6DSV320X_GY_HIGH_PERFORMANCE_MD);
+
+		LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);
+    	LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
+
+		while(1) {
+			lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
+
+			if(status.gda) {
+				LSM6DSV.acceleration_raw_get(raw_accel);
+				Serial.printf("LowG Acceleration \n\nX: ", LSM6DSV.from_fs2_to_mg(raw_accel[0]), "\nY: ", LSM6DSV.from_fs2_to_mg(raw_accel[1]), "\nZ: ", LSM6DSV.from_fs2_to_mg(raw_accel[2]));
+			}
+			
+			delay(500);
+
+			if(status.xlhgda) {
+				LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
+				Serial.printf("HighG Acceleration \n\nX: ", LSM6DSV.from_fs2_to_mg(raw_accel_hg[0]), "\nY: ", LSM6DSV.from_fs2_to_mg(raw_accel_hg[1]), "\nZ: ", LSM6DSV.from_fs2_to_mg(raw_accel_hg[2]), "\n");
+			}
+
+			delay(500);		
+			
+			if(status.gda) {
+				LSM6DSV.angular_rate_raw_get(raw_ar);
+				Serial.printf("Angular Rate\n\nX: ", LSM6DSV.from_fs2000_to_mdps(raw_ar[0]), "\nY: ", LSM6DSV.from_fs2000_to_mdps(raw_ar[1]), "\nZ: ", LSM6DSV.from_fs2000_to_mdps(raw_ar[2]), "\n");
+			}
+
+			delay(500);
 		}
-		Serial.println("lowglsm init successfully");
+
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
@@ -734,6 +768,7 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_IMU
+	/*
 		float ax, ay, az, gx, gy, gz;
 		LSM.readAcceleration(ax, ay, az);
 		LSM.readGyroscope(gx, gy, gz);
@@ -750,6 +785,7 @@ void loop() {
 		Serial.print(ay);
 		Serial.print(" az: ");
 		Serial.println(az);
+	*/
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
@@ -766,7 +802,7 @@ void loop() {
 		uint32_t cx, cy, cz;
 		double X, Y, Z;
 
-		MMC5983.getMeasurementXYZ(&cx, &dy, &cz);
+		MMC5983.getMeasurementXYZ(&cx, &cy, &cz);
 		
 
 	#endif

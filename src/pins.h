@@ -10,6 +10,8 @@
 
 // imu chip select
 #define LSM6DSV320X_CS 43
+#define LSM_INT1 15
+#define LSM_INT2 42 
 
 // magnetometer chip select
 #define MMC5983_CS 4
