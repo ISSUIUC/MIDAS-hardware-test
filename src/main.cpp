@@ -21,7 +21,7 @@
 #include <SparkFun_Qwiic_KX13X.h>
 #include <PL_ADXL355.h>
 #include <Arduino_LSM6DS3.h>
-#include <Adafruit_LIS3MDL.h>
+#include <SparkFun_MMC5983MA_Arduino_Library.h>
 #include <Adafruit_BNO08x.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
@@ -35,15 +35,12 @@
 
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
-// #define ENABLE_HIGHG
-// #define ENABLE_LOWG
-// #define ENABLE_LOWGLSM
-// #define ENABLE_MAGNETOMETER
-// #define ENABLE_ORIENTATION
+// #define ENABLE_IMU
+#define ENABLE_MAGNETOMETER
 // #define ENABLE_EMMC
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
-#define ENABLE_GPS
+// #define ENABLE_GPS
 // #define ENABLE_LORA
 // #define ENABLE_CAN
 // #define ENABLE_FLASH
@@ -53,6 +50,7 @@
 
 // Please be careful
 // This will init the gpio expander by itself
+// Pyro test requires Pyro I2C (may need to change in setup)
 // #define PYRO_TEST
 
 // I'm assuming this is where that one class struct will go
@@ -82,7 +80,7 @@
 #endif
 
 #ifdef ENABLE_MAGNETOMETER
-	Adafruit_LIS3MDL LIS3MDL;
+	SFE_MMC5983MA MMC5983;
 #endif
 
 #ifdef ENABLE_ORIENTATION
@@ -185,6 +183,10 @@ void OnCadDone(bool cadResult)
 }
 #endif
 
+#ifdef MCU_TEST
+	bool light_state = false;
+#endif
+
 #ifdef ENABLE_CHRISTMAS
 // I wanted to be cute
 #include <buzzer.h>
@@ -220,14 +222,13 @@ void setup() {
 	// 	delay(1000);
 	// 	digitalWrite(SPI_MOSI, HIGH);
 	// }
-	pinMode(LSM6DS3_CS, OUTPUT);
-	pinMode(KX134_CS, OUTPUT);
-	pinMode(ADXL355_CS, OUTPUT);
-	pinMode(LIS3MDL_CS, OUTPUT);
-	pinMode(BNO086_CS, OUTPUT);
-	pinMode(BNO086_RESET, OUTPUT);
-	pinMode(CAN_CS, OUTPUT);
-	pinMode(RFM96W_CS, OUTPUT);
+	pinMode(LSM6DSV320X_CS, OUTPUT);
+	pinMode(MMC5983_CS, OUTPUT);
+	pinMode(MS5611_CS, OUTPUT);
+	pinMode(LED_RED, OUTPUT);
+	pinMode(LED_ORANGE, OUTPUT);
+	pinMode(LED_GREEN, OUTPUT);
+	pinMode(LED_BLUE, OUTPUT);
 	// pinMode(21, OUTPUT);
 	// pinMode(47, OUTPUT);
 // pinMode(41, OUTPUT);
@@ -237,15 +238,9 @@ void setup() {
 // digitalWrite(21, HIGH);
 // digitalWrite(47, LOW);
 	digitalWrite(MS5611_CS, HIGH);
-	digitalWrite(LSM6DS3_CS, HIGH);
-	digitalWrite(KX134_CS, HIGH);
-	digitalWrite(ADXL355_CS, HIGH);
-	digitalWrite(LIS3MDL_CS, HIGH);
-	digitalWrite(BNO086_CS, HIGH);
-	digitalWrite(CAN_CS, HIGH);
-	digitalWrite(RFM96W_CS, HIGH);
-
-	digitalWrite(BNO086_RESET, LOW);
+	digitalWrite(LSM6DSV320X_CS, HIGH);
+	digitalWrite(MMC5983_CS, HIGH);
+	digitalWrite(E22_CS, HIGH);
 
 #ifdef ENABLE_CHRISTMAS
     pinMode(BUZZER_PIN, OUTPUT);
@@ -274,24 +269,6 @@ void setup() {
 	char t[256];
 	file.read((uint8_t*) t, strlen("Hello world"));
 	Serial.println(t);
-#endif
-#ifdef ENABLE_CAN
-    // Serial.println("Starting I2C...");
-	CAN.setSPI(&SPI);
-	while (0 != CAN.begin(CAN_125K_500K))// Initialize CAN BUS with baud rate of 125 kbps and arbitration rate of 500k
-		// This should be in while loop because MCP2518
-		// needs some time to initialize and start function
-		// properly.
-	{
-		Serial.println("CAN init fail, retry..."); // Print information message
-		delay(100);
-	}
-	Serial.println("CAN init ok!");
-
-	for (int i = 0; i < MAX_DATA_SIZE; i++) // Fill buffer with ascending numbers 
-	{
-		stmp[i] = i;
-	}
 #endif
 
 #ifdef ENABLE_LORA
@@ -363,49 +340,7 @@ void setup() {
 		Serial.println("barometer init successfully");
 	#endif
 
-	#ifdef ENABLE_HIGHG
-		KX.beginSPI(KX134_CS, 100000);
-		if (!KX.initialize(DEFAULT_SETTINGS)) {
-			Serial.println("could not init highg");
-			while(1);
-		}
-		if(!KX.setOutputDataRate(0xb)) {
-			Serial.println("could not update data rate of highg");
-			while(1);
-		}
-		KX.setRange(3);
-		Serial.println("highg init successfully");
-	#endif
-
-	#ifdef ENABLE_LOWG
-		Serial.println("Before sensor.start");
-		sensor.begin();
-		Serial.println("Initializing lowg");
-		sensor.enableMeasurement();
-
-		// if (sensor.isDeviceRecognized()){
-		// 	Serial.println("Device is recognized");
-		// 	sensor.initializeSensor(Adxl355::RANGE_VALUES::RANGE_2G, Adxl355::ODR_LPF::ODR_1000_AND_250);
-		// 	Serial.println("Sensor is initialized");
-		// 	if (Adxl355::RANGE_VALUES::RANGE_2G != sensor.getRange()){
-		// 		Serial.println("could not set range lowg");
-		// 		while(1);
-		// 	}
-
-		// 	if (Adxl355::ODR_LPF::ODR_4000_AND_1000 != sensor.getOdrLpf()){
-		// 		Serial.println("could not set odrlpf lowg");
-		// 		while(1);
-		// 	}
-		// }
-		// else{
-		// 	Serial.println("could not init lowg");
-		// 	while(1);
-		// }
-   		// sensor.calibrateSensor(1);
-		Serial.println("lowg init successfully");
-	#endif
-
-	#ifdef ENABLE_LOWGLSM
+	#ifdef ENABLE_IMU
 		if (!LSM.begin()) {
 			Serial.println("could not init lowglsm");
 			while(1);
@@ -414,14 +349,30 @@ void setup() {
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
-		if (!LIS3MDL.begin_SPI(LIS3MDL_CS)){
-			Serial.println("could not init magnetometer");
-			while(1);
+		// // if (!LIS3MDL.begin_SPI(LIS3MDL_CS)){
+		// // 	Serial.println("could not init magnetometer");
+		// // 	while(1);
+		// // }
+		// // LIS3MDL.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+		// // LIS3MDL.setDataRate(LIS3MDL_DATARATE_5_HZ);
+		// // LIS3MDL.setRange(LIS3MDL_RANGE_4_GAUSS);
+		// // Serial.println("magnetometer init successfully");
+
+		while(MMC5983.begin(MMC5983_CS) == false) {
+			Serial.println("Mag init failed");
+			delay(200);
+			MMC5983.softReset();
+			delay(200);
+
 		}
-		LIS3MDL.setOperationMode(LIS3MDL_CONTINUOUSMODE);
-		LIS3MDL.setDataRate(LIS3MDL_DATARATE_5_HZ);
-		LIS3MDL.setRange(LIS3MDL_RANGE_4_GAUSS);
-		Serial.println("magnetometer init successfully");
+
+		// sanity check
+		int t = MMC5983.getTemperature();
+		Serial.print("Reported die temp: ");
+		Serial.print(t);
+		Serial.println("C");
+
+
 	#endif
 
 	#ifdef ENABLE_EMMC
@@ -572,29 +523,6 @@ void setup() {
 	// gpioDigitalWrite(GpioAddress(1, 01), HIGH); // Set the bno pin mode to 01
 
 		
-	#ifdef ENABLE_ORIENTATION
-
-		/*if (!TCAL9539Init()) {
-			Serial.println("Failed to initialize TCAL9539!");
-			// while(1){ };
-		}
-
-		Serial.println("TCAL9539 initialized successfully!");*/
-		Serial.println("Delaying");
-		delay(1000);
-		Serial.println("Delayed done!");
-		if (!imu.begin_SPI(BNO086_CS, BNO086_INT)) {
-			Serial.println("could not init orientation");
-			while(1) {Serial.println("could not init orientation");}
-		}
-		Serial.println("BNO inited SPI");
-		if (!imu.enableReport(SH2_ARVR_STABILIZED_RV, 5000)) {
-			Serial.println("Could not enable stabilized remote vector");
-			while(1) {Serial.println("Could not enable stabilized remote vector");}
-		}
-		Serial.println("orientation init successfully");
-		
-	#endif
 	// Wire1.begin(PYRO_SDA, PYRO_SCL);
 	#ifdef ENABLE_INA
 	Wire.beginTransmission(0x44);
@@ -658,45 +586,17 @@ int read_reg(int reg, int bytes) {
 
 void loop() {
 
-	#ifdef ENABLE_PWR_MONITOR
-		int power = read_reg(0x8, 3);
-		int current = read_reg(0x7, 2);
-		int temp = read_reg(0x6, 2);
-		int voltage = read_reg(0x5, 2);
-		Serial.print("Voltage ");
-		Serial.println(voltage * 3.125 / 1000.0);
-		Serial.print("Temp ");
-		Serial.println(temp * 125 / 1000.0);
-		Serial.print("Current ");
-		Serial.println(current * 1.2 / 1000.0);
-		Serial.print("Power ");
-		Serial.println(power * 240 / 1000000.0);
-	#endif
-
-	#ifdef ENABLE_CAN
-	auto err_code = CAN.sendMsgBuf(0x01, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
-	if (err_code != 0) {
-		Serial.print("Failed: ");
-		Serial.println(err_code);
-
-	} else {
-		Serial.println("CAN BUS sendMsgBuf ok!"); // Print message
-	}
-	// First parameter - which ID to set in frame (ID of transmitter)
-	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
-	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
-	// Fourth parameter - Buffer which contains data to send
-	// delay(10); // Wait a bit for CAN module to send data
-	// CAN.sendMsgBuf(0x04, 0, CANFD::len2dlc(MAX_DATA_SIZE), stmp); // Send data in CAN network
-	// First parameter - which ID to set in frame (ID of transmitter)
-	// Second parameter - Frame size (0 - Normal frame, 1 - Extended frame)
-	// Third parameter - Length of buffer in bytes, but converted in Data Length Code
-	// Fourth parameter - Buffer which contains data to send
-	delay(1000); // Wait a bit not to overfill network
-	#endif
-
+	
 	#ifdef MCU_TEST
-		Serial.println("test");
+		Serial.println("hello world");
+
+		light_state = !light_state;
+
+		digitalWrite(LED_RED, light_state ? HIGH : LOW);
+		digitalWrite(LED_ORANGE, light_state ? HIGH : LOW);
+		digitalWrite(LED_GREEN, light_state ? HIGH : LOW);
+		digitalWrite(LED_BLUE, light_state ? HIGH : LOW);
+
 	#endif
 
 	#ifdef ENABLE_CHRISTMAS
@@ -833,27 +733,7 @@ void loop() {
 		Serial.println(altitude);
 	#endif
 
-	#ifdef ENABLE_HIGHG
-		auto data = KX.getAccelData();
-		Serial.print("ax: ");
-		Serial.print(data.xData);
-		Serial.print(" ay: ");
-		Serial.print(data.yData);
-		Serial.print(" az: ");
-		Serial.println(data.zData);
-	#endif
-
-	#ifdef ENABLE_LOWG
-		auto data_adxl = sensor.getAccelerations();
-		Serial.print("ax: ");
-		Serial.print(data_adxl.x);
-		Serial.print(" ay: ");
-		Serial.print(data_adxl.y);
-		Serial.print(" az: ");
-		Serial.println(data_adxl.z);
-	#endif
-
-	#ifdef ENABLE_LOWGLSM
+	#ifdef ENABLE_IMU
 		float ax, ay, az, gx, gy, gz;
 		LSM.readAcceleration(ax, ay, az);
 		LSM.readGyroscope(gx, gy, gz);
@@ -873,36 +753,22 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
-		LIS3MDL.read();
-		float mx = LIS3MDL.x_gauss;
-		float my = LIS3MDL.y_gauss;
-		float mz = LIS3MDL.z_gauss;
-		Serial.print("mx: ");
-		Serial.print(mx);
-		Serial.print(" my: ");
-		Serial.print(my);
-		Serial.print(" mz: ");
-		Serial.println(mz);
-	#endif
+		// LIS3MDL.read();
+		// float mx = LIS3MDL.x_gauss;
+		// float my = LIS3MDL.y_gauss;
+		// float mz = LIS3MDL.z_gauss;
+		// Serial.print("mx: ");
+		// Serial.print(mx);
+		// Serial.print(" my: ");
+		// Serial.print(my);
+		// Serial.print(" mz: ");
+		// Serial.println(mz);
+		uint32_t cx, cy, cz;
+		double X, Y, Z;
 
-	#ifdef ENABLE_ORIENTATION
-		sh2_SensorValue_t event;
-		Vec3 euler;
-		if (imu.getSensorEvent(&event)) {
-			switch (event.sensorId) {
-				case SH2_ARVR_STABILIZED_RV:
-					euler = quaternionToEulerRV(&event.un.arvrStabilizedRV, true);
-				case SH2_GYRO_INTEGRATED_RV:
-					euler = quaternionToEulerGI(&event.un.gyroIntegratedRV, true);
-					break;
-			}
-			Serial.print("yaw: ");
-			Serial.print(euler.y);
-			Serial.print(" pitch: ");
-			Serial.print(euler.z);
-			Serial.print(" roll: ");
-			Serial.println(euler.x);
-		}
+		MMC5983.getMeasurementXYZ(&cx, &dy, &cz);
+		
+
 	#endif
 
 	#ifdef ENABLE_ADS
