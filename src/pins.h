@@ -21,6 +21,10 @@
 #define I2C_SDA 21
 #define I2C_SCL 26
 
+// gpio expander
+#define EXP_RST 13
+#define EXP_INT 48
+
 // buzzer pin
 #define BUZZER_PIN 12
 #define BUZZER_CHANNEL 1

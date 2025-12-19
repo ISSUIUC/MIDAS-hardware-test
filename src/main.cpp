@@ -4,25 +4,16 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <FS.h>
-#include <SD_MMC.h>
 #include <MicroNMEA.h>
-// #include <RH_RF95.h>
 #include <SD_MMC.h>
-// #include <CANBus-SOLDERED.h>
 
 #include "pins.h"
-#include "bno_functions.h"
 #include "emmc_functions.h"
-#include "TCAL9539.h"
-#include "teseo_liv3f_class.h"
+#include "TCAL9538.h"
 #include "ads7138-q1.h"
 
 #include <MS5611.h>
-#include <SparkFun_Qwiic_KX13X.h>
-#include <PL_ADXL355.h>
-#include <Arduino_LSM6DS3.h>
 #include <SparkFun_MMC5983MA_Arduino_Library.h>
-#include <Adafruit_BNO08x.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
@@ -34,9 +25,10 @@
 #define WAIT_FOR_SERIAL
 
 // #define MCU_TEST
+#define I2C_SCAN
 // #define ENABLE_BAROMETER
 // #define ENABLE_IMU
-#define ENABLE_MAGNETOMETER
+// #define ENABLE_MAGNETOMETER
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
@@ -430,19 +422,19 @@ void setup() {
 		}
 		return true;*/
 
-		if (!TCAL9539Init()) {
-			Serial.println("Failed to initialize TCAL9539!");
+		while (!TCAL9538Init(EXP_RST)) {
+			Serial.println("Failed to initialize TCAL9538!");
 			// while(1){ };
 		}
 
-		Serial.println("TCAL9539 initialized successfully!");
+		Serial.println("TCAL9538 initialized successfully!");
 
-		for (int i = 0; i <= 017; i++) {
-			gpioPinMode(GpioAddress(2, i), OUTPUT);
-			gpioDigitalWrite(GpioAddress(2, i), LOW);
+		for (int i = 0; i <= 7; i++) {
+			gpioPinMode(GpioAddress(0, i), OUTPUT);
+			gpioDigitalWrite(GpioAddress(0, i), LOW);
 		}
-		gpioPinMode(GpioAddress(1, 04), INPUT);
-		Serial.println(gpioDigitalRead(GpioAddress(1, 04)).value);
+		gpioPinMode(GpioAddress(0, 4), INPUT);
+		Serial.println(gpioDigitalRead(GpioAddress(0, 4)).value);
 
 	#endif
 
@@ -565,6 +557,19 @@ void loop() {
 
 	#endif
 
+	#ifdef I2C_SCAN
+		Serial.println("Beginning I2C Scan:");
+		for (int i = 0; i<128; i++){
+			Wire.beginTransmission(i);
+			if (!Wire.endTransmission()){
+				Serial.print("Device found at: 0x");
+				Serial.println(i, HEX);
+			}
+		}
+		delay(1000);
+
+	#endif
+
 	#ifdef ENABLE_CHRISTMAS
 		// just play the entire song
 		// assume gpio is enabled this is for fun anyway
@@ -592,21 +597,18 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_GPIOEXP
-
-		// gpioDigitalWrite(GpioAddress(2, 014), HIGH);
-		gpioDigitalWrite(GpioAddress(2, 015), HIGH);
-		delay(200);
-		gpioDigitalWrite(GpioAddress(2, 015), LOW);
-		gpioDigitalWrite(GpioAddress(2, 017), HIGH);
-		delay(200);
-		gpioDigitalWrite(GpioAddress(2, 017), LOW);
-		// Serial.println("Looped high");
-		// // gpioDigitalWrite(GpioAddress(2, 014), LOW);
-		// gpioDigitalWrite(GpioAddress(2, 015), LOW);
-		// gpioDigitalWrite(GpioAddress(2, 016), LOW);
-		// gpioDigitalWrite(GpioAddress(2, 017), LOW);
-		// Serial.println("Looped");
-		// delay(500);
+		gpioDigitalWrite(GpioAddress(0, 0), HIGH);
+		gpioDigitalWrite(GpioAddress(0, 1), HIGH);
+		gpioDigitalWrite(GpioAddress(0, 6), HIGH);
+		gpioDigitalWrite(GpioAddress(0, 7), HIGH);
+		Serial.println("high");
+		delay(1000);
+		gpioDigitalWrite(GpioAddress(0, 0), LOW);
+		gpioDigitalWrite(GpioAddress(0, 1), LOW);
+		gpioDigitalWrite(GpioAddress(0, 6), LOW);
+		gpioDigitalWrite(GpioAddress(0, 7), LOW);
+		Serial.println("low");
+		delay(1000);
 	#endif
 
 	#ifdef PYRO_TEST
