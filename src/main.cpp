@@ -6,7 +6,7 @@
 #include <FS.h>
 #include <SD_MMC.h>
 #include <MicroNMEA.h>
-#include <RH_RF95.h>
+// #include <RH_RF95.h>
 #include <SD_MMC.h>
 // #include <CANBus-SOLDERED.h>
 
@@ -29,13 +29,15 @@
 
 #include <lsm6dsv320x.h>
 
+// SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
+
 #define WAIT_FOR_SERIAL
 
 // #define MCU_TEST
 // #define ENABLE_BAROMETER
 // #define ENABLE_IMU
-// #define ENABLE_MAGNETOMETER
-#define ENABLE_ADS
+#define ENABLE_MAGNETOMETER
+// #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
@@ -186,7 +188,7 @@ void setup() {
 
 
 	#ifdef WAIT_FOR_SERIAL
-		while(!Serial);
+		while(!Serial) {};
 		Serial.println("Serial ready");
 	#endif
 
@@ -360,8 +362,25 @@ void setup() {
 			delay(200);
 			MMC5983.softReset();
 			delay(200);
-
 		}
+		// uint8_t rd = 0;
+		// while (true) {
+
+		// 	SPI.beginTransaction(MMCSPISETTINGS);
+		// 	digitalWrite(MMC5983_CS, LOW);
+		// 	SPI.transfer((0x80 | PROD_ID_REG)); // set msb for rd
+		// 	rd = SPI.transfer(0);
+		// 	digitalWrite(MMC5983_CS, HIGH);
+		// 	SPI.endTransaction();
+
+		// 	if(rd == 48) {
+		// 		return;
+		// 	}
+		// 	delay(100);
+		// }
+
+
+		// }
 
 		// sanity check
 		int t = MMC5983.getTemperature();
@@ -369,8 +388,11 @@ void setup() {
 		Serial.print(t);
 		Serial.println("C");
 
-		MMC5983.enableXChannel();
-		MMC5983.enableYZChannels();
+		// MMC5983.performSetOperation();
+		// MMC5983.enableXChannel();
+		// // MMC5983.enableYZChannels();
+		// MMC5983.disableInterrupt();
+		// MMC5983.disableContinuousMode();
 
 
 	#endif
@@ -723,27 +745,83 @@ void loop() {
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
-		// LIS3MDL.read();
-		// float mx = LIS3MDL.x_gauss;
-		// float my = LIS3MDL.y_gauss;
-		// float mz = LIS3MDL.z_gauss;
-		// Serial.print("mx: ");
-		// Serial.print(mx);
-		// Serial.print(" my: ");
-		// Serial.print(my);
-		// Serial.print(" mz: ");
-		// Serial.println(mz);
 		uint32_t cx, cy, cz;
 		double X, Y, Z;
 
-		cx = MMC5983.getMeasurementX();
-		cy = MMC5983.getMeasurementY();
-		cz = MMC5983.getMeasurementZ();
+		MMC5983.getMeasurementXYZ(&cx, &cy, &cz);
 
-		//MMC5983.getMeasurementXYZ(&cx, &cy, &cz);
-		int temp = MMC5983.getTemperature();
+		Serial.print("Mag measurement: ");
+
+
+		double sf = (double)(1 << 17);
+		X = ((double)cx - sf)/sf;
+		Y = ((double)cy - sf)/sf;
+		Z = ((double)cz - sf)/sf;
+		Serial.print(X);
+		Serial.print(" ");
+		Serial.print(Y);
+		Serial.print(" ");
+		Serial.println(Z);
 		
-		Serial.printf("Mag\nTemp:%d\nX: %f\nY: %F\nZ: %f\n", temp,cx, cy,cz);
+
+		
+
+
+		// SPI.beginTransaction(MMCSPISETTINGS);
+		// digitalWrite(MMC5983_CS, LOW);
+		// SPI.transfer(0x09);
+		// SPI.transfer(0b00000001);
+		// digitalWrite(MMC5983_CS, HIGH);
+		// SPI.endTransaction();
+
+		// delay(20);
+		
+		// // x0
+		// SPI.beginTransaction(MMCSPISETTINGS);
+		// digitalWrite(MMC5983_CS, LOW);
+		// SPI.transfer((0x80 | X_OUT_0_REG));
+		// uint8_t x0 = SPI.transfer(0);
+		// digitalWrite(MMC5983_CS, HIGH);
+		// SPI.endTransaction();
+
+		// // x1
+		// SPI.beginTransaction(MMCSPISETTINGS);
+		// digitalWrite(MMC5983_CS, LOW);
+		// SPI.transfer((0x80 | X_OUT_1_REG));
+		// uint8_t x1 = SPI.transfer(0);
+		// digitalWrite(MMC5983_CS, HIGH);
+		// SPI.endTransaction();
+
+		// // xyz
+		// SPI.beginTransaction(MMCSPISETTINGS);
+		// digitalWrite(MMC5983_CS, LOW);
+		// SPI.transfer((0x80 | XYZ_OUT_2_REG));
+		// uint8_t xyz = SPI.transfer(0);
+		// digitalWrite(MMC5983_CS, HIGH);
+		// SPI.endTransaction();
+
+		// uint32_t xval = ((xyz >> 6) & 0x3) + (x1 << 2) + (x0 << 10);
+
+		// Serial.print("raw: ");
+		// Serial.print(x0, 2);
+		// Serial.print(" ");
+		// Serial.print(x1, 2);
+		// Serial.print(" ");
+		// Serial.print(((xyz >> 6) & 0x3), 2);
+		// Serial.print(" \nRead:");
+		// Serial.println(xval);
+
+		// cx = MMC5983.getMeasurementX();
+		// cy = MMC5983.getMeasurementY();
+		// cz = MMC5983.getMeasurementZ();
+
+		// MMC5983.readFieldsXYZ(&cx, &cy, &cz);
+		// int temp = MMC5983.getTemperature();
+		// Serial.println("MAG:  ");
+		// Serial.print(MMC5983.isXChannelEnabled() ? "X" : "-");
+		// // Serial.print(MMC5983.isConnected() ? "+" : "-");
+		// // Serial.print(MMC5983.getFilterBandwith());
+		// Serial.printf("\nTemp:%d\nX: %f\nY: %F\nZ: %f\n", temp,cx, cy,cz);
 
 	#endif
 

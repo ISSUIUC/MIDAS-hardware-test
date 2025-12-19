@@ -15,6 +15,7 @@
 
 // magnetometer chip select
 #define MMC5983_CS 4
+#define MMC5983_INT 7
 
 // i2c bus pins
 #define I2C_SDA 21
