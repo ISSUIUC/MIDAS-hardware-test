@@ -32,11 +32,10 @@
 #define WAIT_FOR_SERIAL
 
 // #define MCU_TEST
-//#define ENABLE_BAROMETER
- #define ENABLE_IMU
+// #define ENABLE_BAROMETER
+// #define ENABLE_IMU
 // #define ENABLE_MAGNETOMETER
-// #define ENABLE_EMMC
-// #define ENABLE_ADS
+#define ENABLE_ADS
 // #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
@@ -78,15 +77,6 @@
 #ifdef ENABLE_MAGNETOMETER
 	SFE_MMC5983MA MMC5983;
 #endif
-
-#ifdef ENABLE_ORIENTATION
-	Adafruit_BNO08x imu(BNO086_RESET);
-#endif
-
-#ifdef ENABLE_EMMC
-	uint8_t buff[8192];
-#endif
-
 
 #ifdef ENABLE_GPS
 SFE_UBLOX_GNSS myGNSS;
@@ -221,6 +211,7 @@ void setup() {
 	pinMode(LSM6DSV320X_CS, OUTPUT);
 	pinMode(MMC5983_CS, OUTPUT);
 	pinMode(MS5611_CS, OUTPUT);
+	pinMode(E22_CS, OUTPUT);
 	pinMode(LED_RED, OUTPUT);
 	pinMode(LED_ORANGE, OUTPUT);
 	pinMode(LED_GREEN, OUTPUT);
@@ -378,63 +369,10 @@ void setup() {
 		Serial.print(t);
 		Serial.println("C");
 
+		MMC5983.enableXChannel();
+		MMC5983.enableYZChannels();
 
-	#endif
 
-	#ifdef ENABLE_EMMC
-		if(!SD_MMC.setPins(EMMC_CLK, EMMC_CMD, EMMC_D0)){
-			Serial.println("Pin change failed!");
-			return;
-		}
-		// if(!SD_MMC.begin()){
-
-		if(!SD_MMC.begin("/sdcard", true, true, SDMMC_FREQ_52M, 5)){
-			Serial.println("Card Mount Failed");
-			;
-		}
-		uint8_t cardType = SD_MMC.cardType();
-
-		if(cardType == CARD_NONE){
-			Serial.println("No SD_MMC card attached");
-		}
-
-		Serial.print("SD_MMC Card Type: ");
-		if(cardType == CARD_MMC){
-			Serial.println("MMC");
-		} else if(cardType == CARD_SD){
-			Serial.println("SDSC");
-		} else if(cardType == CARD_SDHC){
-			Serial.println("SDHC");
-		} else {
-			Serial.println("UNKNOWN");
-		}
-
-		uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
-		Serial.print("SD_MMC Card Size: ");
-		Serial.print(cardSize);
-		Serial.println("MB");
-		File f = SD_MMC.open("/midas.txt", FILE_WRITE, true);
-		auto m1 = micros();
-		std::fill(buff, buff + 8192, 'q');
-		for(int i = 0; i < 10; i++){
-			f.write(buff, 8192);
-		}
-		Serial.println(micros() - m1);
-		f.close();
-		// listDir(SD_MMC, "/", 0);
-		// createDir(SD_MMC, "/mydir");
-		// listDir(SD_MMC, "/", 0);
-		// removeDir(SD_MMC, "/mydir");
-		// listDir(SD_MMC, "/", 2);
-		// writeFile(SD_MMC, "/hello.txt", "Hello ");
-		// appendFile(SD_MMC, "/hello.txt", "World!\n");
-		// readFile(SD_MMC, "/hello.txt");
-		// deleteFile(SD_MMC, "/foo.txt");
-		// renameFile(SD_MMC, "/hello.txt", "/foo.txt");
-		// readFile(SD_MMC, "/foo.txt");
-		// testFileIO(SD_MMC, "/test.txt");
-		Serial.printf("Total space: %lluMB\n", SD_MMC.totalBytes() / (1024 * 1024));
-		Serial.printf("Used space: %lluMB\n", SD_MMC.usedBytes() / (1024 * 1024));
 	#endif
 
 	#ifdef ENABLE_ADS
@@ -798,19 +736,40 @@ void loop() {
 		uint32_t cx, cy, cz;
 		double X, Y, Z;
 
-		MMC5983.getMeasurementXYZ(&cx, &cy, &cz);
+		cx = MMC5983.getMeasurementX();
+		cy = MMC5983.getMeasurementY();
+		cz = MMC5983.getMeasurementZ();
+
+		//MMC5983.getMeasurementXYZ(&cx, &cy, &cz);
+		int temp = MMC5983.getTemperature();
 		
+		Serial.printf("Mag\nTemp:%d\nX: %f\nY: %F\nZ: %f\n", temp,cx, cy,cz);
 
 	#endif
 
 	#ifdef ENABLE_ADS
-		for (int i = 0; i < 8; i++) {
-			Serial.print("Address ");
-			Serial.print(i);
-			Serial.print(": ");
-			Serial.print(adcAnalogRead(ADCAddress{i}).value + ", ");
-		}
-		Serial.println();
+		// for (int i = 0; i < 8; i++) {
+		// 	Serial.print("Address ");
+		// 	Serial.print(i);
+		// 	Serial.print(": ");
+		// 	Serial.println(adcAnalogRead(ADCAddress{i}).value);
+		// }
+		Serial.print("0: ");
+		Serial.println((adcAnalogRead(ADCAddress{0}).value)/4096.0*6.55*3.3);
+		Serial.print("1: ");
+		Serial.println((adcAnalogRead(ADCAddress{1}).value)/4096.0*6.55*3.3);
+		Serial.print("2: ");
+		Serial.println((adcAnalogRead(ADCAddress{2}).value)/4096.0*6.60*3.3);
+		Serial.print("3: ");
+		Serial.println((adcAnalogRead(ADCAddress{3}).value)/4096.0*3.3);
+		Serial.print("4: ");
+		Serial.println((adcAnalogRead(ADCAddress{4}).value)/4096.0*6.55*3.3);
+		Serial.print("5: ");
+		Serial.println((adcAnalogRead(ADCAddress{5}).value)/4096.0*6.55*3.3);
+		Serial.print("6: ");
+		Serial.println((adcAnalogRead(ADCAddress{6}).value)/4096.0*2.00*3.3);
+		Serial.print("7: ");
+		Serial.println((adcAnalogRead(ADCAddress{7}).value)/4096.0*2.00*3.3);
 	#endif
 
 	#ifdef ENABLE_GPS
