@@ -15,6 +15,7 @@ TwoWire& tcal_get_wire_by_id(int index) {
     // else {
     //     return Wire1;
     // }
+    return Wire;
 }
 
 bool TCAL9538Init(int reset_pin){

@@ -1,4 +1,4 @@
-/* basic testing script for midas board bringup. tests spi sensors as well as emmc chip */
+/* basic testing script for midas board bringup */
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -24,8 +24,8 @@
 
 #define WAIT_FOR_SERIAL
 
-// #define MCU_TEST
-#define I2C_SCAN
+#define MCU_TEST
+// #define I2C_SCAN
 // #define ENABLE_BAROMETER
 // #define ENABLE_IMU
 // #define ENABLE_MAGNETOMETER
@@ -33,15 +33,11 @@
 // #define ENABLE_GPIOEXP
 // #define ENABLE_GPS
 // #define ENABLE_LORA
-// #define ENABLE_CAN
 // #define ENABLE_FLASH
-// #define ENABLE_INA
 // #define ENABLE_CHRISTMAS
-// #define ENABLE_PWR_MONITOR
 
 // Please be careful
 // This will init the gpio expander by itself
-// Pyro test requires Pyro I2C (may need to change in setup)
 // #define PYRO_TEST
 
 #ifdef ENABLE_IMU
@@ -56,18 +52,6 @@
 	MS5611 MS(MS5611_CS);
 #endif
 
-#ifdef ENABLE_HIGHG
-	QwiicKX134 KX;
-#endif
-
-#ifdef ENABLE_LOWG
-	PL::ADXL355 sensor(ADXL355_CS);
-#endif
-
-#ifdef ENABLE_LOWGLSM
-	LSM6DSV320XClass LSM(SPI, LSM6DS3_CS, 46);
-#endif
-
 #ifdef ENABLE_MAGNETOMETER
 	SFE_MMC5983MA MMC5983;
 #endif
@@ -77,14 +61,6 @@ SFE_UBLOX_GNSS myGNSS;
 char nmeaBuffer[100];
 MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 #endif
-
-#ifdef ENABLE_INA
-
-#endif
-#ifdef ENABLE_CAN
-CANBus CAN(CAN_CS); // Set CS pin
-#endif
-#define MAX_DATA_SIZE 64
 
 #ifdef PYRO_TEST
 	int CUR_PYRO = 0; // 0 --> off, 1-->A, 2-->B, 3-->C, 4-->D
@@ -188,20 +164,10 @@ void setup() {
 	delay(1000);
 
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-	// Wire.begin(PYRO_SDA, PYRO_SCL);
 
 	Wire.begin(I2C_SDA, I2C_SCL);
 	Serial.println("Initialized SPI");
 
-	// Serial.println("beginning sensor test");
-	
-	// pinMode(SPI_MOSI, OUTPUT);
-	// while(1) {
-	// 	delay(1000);
-	// 	digitalWrite(SPI_MOSI, LOW);
-	// 	delay(1000);
-	// 	digitalWrite(SPI_MOSI, HIGH);
-	// }
 	pinMode(LSM6DSV320X_CS, OUTPUT);
 	pinMode(MMC5983_CS, OUTPUT);
 	pinMode(MS5611_CS, OUTPUT);
@@ -210,14 +176,7 @@ void setup() {
 	pinMode(LED_ORANGE, OUTPUT);
 	pinMode(LED_GREEN, OUTPUT);
 	pinMode(LED_BLUE, OUTPUT);
-	// pinMode(21, OUTPUT);
-	// pinMode(47, OUTPUT);
-// pinMode(41, OUTPUT);
-// 	pinMode(42, OUTPUT);
-// 	digitalWrite(41, LOW);
-// 	digitalWrite(42, LOW);
-// digitalWrite(21, HIGH);
-// digitalWrite(47, LOW);
+
 	digitalWrite(MS5611_CS, HIGH);
 	digitalWrite(LSM6DSV320X_CS, HIGH);
 	digitalWrite(MMC5983_CS, HIGH);
@@ -226,7 +185,6 @@ void setup() {
 #ifdef ENABLE_CHRISTMAS
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, LOW);
-    ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
 #endif
 
 #ifdef ENABLE_FLASH
@@ -442,19 +400,13 @@ void setup() {
 
 		pinMode(BUZZER_PIN, OUTPUT);
 		digitalWrite(BUZZER_PIN, LOW);
-		ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
 
-		if (!TCAL9539Init()) {
-			Serial.println("Failed to initialize TCAL9539!");
+		if (!TCAL9538Init()) {
+			Serial.println("Failed to initialize TCAL9538!");
 			// while(1){ };
 		}
 
-		Serial.println("TCAL9539 initialized successfully!");
-
-		for (int i = 0; i <= 017; i++) {
-			gpioPinMode(GpioAddress(2, i), OUTPUT);
-			gpioDigitalWrite(GpioAddress(2, i), LOW);
-		}
+		Serial.println("TCAL9538 initialized successfully!");
 
 		for (int i = 0; i <= 017; i++) {
 			gpioPinMode(GpioAddress(0, i), OUTPUT);
@@ -476,71 +428,7 @@ void setup() {
 	//This will pipe all NMEA sentences to the serial port so we can see them
 	myGNSS.setNMEAOutputPort(Serial);
 	#endif
-	// gpioPinMode(GpioAddress(1, 01), OUTPUT);
-
-	// gpioDigitalWrite(GpioAddress(1, 01), HIGH); // Set the bno pin mode to 01
-
-		
-	// Wire1.begin(PYRO_SDA, PYRO_SCL);
-	#ifdef ENABLE_INA
-	Wire.beginTransmission(0x44);
-	Wire.write(0x3E);
-	Wire.endTransmission();
-	Wire.requestFrom(0x44, 2);
-	Serial.println(Wire.read());
-	Serial.println(Wire.read());
-
-	// for (int i = 0; i < )
-	byte error, address;
-  int nDevices;
-  Serial.println("Scanning...");
-  nDevices = 0;
-  for(address = 1; address < 127; address++ ) {
-	// Serial.println("Scanning...");
-    Wire.beginTransmission(address);
-	// Serial.println("Scanning2...");
-    error = Wire.endTransmission();
-    if (error == 0) {
-      Serial.print("I2C device found at address 0x");
-      if (address<16) {
-        Serial.print("0");
-      }
-      Serial.println(address,HEX);
-      nDevices++;
-    }
-    else if (error==4) {
-      Serial.print("Unknow error at address 0x");
-      if (address<16) {
-        Serial.print("0");
-      }
-      Serial.println(address,HEX);
-    }    
-  }
-  if (nDevices == 0) {
-    Serial.println("No I2C devices found\n");
-  }
-  else {
-    Serial.println("done\n");
-  }
-  delay(5000); 
-	#endif
 }
-int read_reg(int reg, int bytes) {
-    Wire.beginTransmission(0x44);
-    Wire.write(reg);
-    if(Wire.endTransmission()){
-        Serial.println("I2C Error");
-    }
-    Wire.requestFrom(0x40, bytes);
-    int val = 0;
-    for(int i = 0; i < bytes; i++){
-        int v = Wire.read();
-        if(v == -1) Serial.println("I2C Read Error");
-        val = (val << 8) | v;
-    }
-    return val;
-}
-
 
 void loop() {
 
@@ -580,14 +468,16 @@ void loop() {
 
 			cur_light_state = !cur_light_state;
 
-			gpioDigitalWrite(GpioAddress(2, 014), LOW);
-			gpioDigitalWrite(GpioAddress(2, 016), LOW);
-			gpioDigitalWrite(GpioAddress(2, 015), cur_light_state ? HIGH : LOW);
-			gpioDigitalWrite(GpioAddress(2, 017), cur_light_state ? LOW : HIGH);
+			digitalWrite(LED_BLUE, LOW);
+			digitalWrite(LED_ORANGE, LOW);
+			digitalWrite(LED_GREEN, cur_light_state ? HIGH : LOW);
+			digitalWrite(LED_RED, cur_light_state ? LOW : HIGH);
 
 			Sound cur_sound = merry_christmas[i];
-			ledcWriteTone(BUZZER_CHANNEL, cur_sound.frequency);
+			tone(BUZZER_PIN, cur_sound.frequency);
 			delay(cur_sound.duration_ms);
+			noTone(BUZZER_PIN);
+			delay(10);
 		}
 
 		Serial.println("Delaying 2s before playing again");
@@ -613,74 +503,17 @@ void loop() {
 
 	#ifdef PYRO_TEST
 
-		// // force-disable all pyro
-		// gpioDigitalWrite(GpioAddress(0, 06), LOW); // pyro disabled
-
-		// gpioDigitalWrite(GpioAddress(0, 00), LOW);
-		// gpioDigitalWrite(GpioAddress(0, 01), LOW);
-		// gpioDigitalWrite(GpioAddress(0, 03), LOW);
-		// gpioDigitalWrite(GpioAddress(0, 04), LOW);
-
-		// // Red pin, no noise, 10s
-		// gpioDigitalWrite(GpioAddress(2, 017), HIGH);
-		// delay(5000);
-
-		// // Red pin, noise, 5s
-
-		// for(unsigned i = 0; i < 3; i++) {
-			
-		// 	ledcWriteTone(BUZZER_CHANNEL, 2000);
-		// 	delay(100);
-		// 	ledcWriteTone(BUZZER_CHANNEL, 0);
-		// 	delay(900);	
-			
-		// }
-
-		// // Red pin, fast noise, 2s
-
-		// for(unsigned i = 0; i < 2*4; i++) {
-		// 	ledcWriteTone(BUZZER_CHANNEL, 2000);
-		// 	delay(150);
-		// 	ledcWriteTone(BUZZER_CHANNEL, 0);
-		// 	delay(100);
-		// }
-
-		// // fire pyro
-
-		// gpioDigitalWrite(GpioAddress(0, 06), HIGH); // pyro enabled
-
-		// gpioDigitalWrite(GpioAddress(0, 00), HIGH);
-		// gpioDigitalWrite(GpioAddress(0, 01), HIGH);
-		// gpioDigitalWrite(GpioAddress(0, 03), HIGH);
-		// gpioDigitalWrite(GpioAddress(0, 04), HIGH);
-
-		// delay(200);
-
-		// gpioDigitalWrite(GpioAddress(0, 06), LOW); // pyro disabled
-
-		// gpioDigitalWrite(GpioAddress(0, 00), LOW);
-		// gpioDigitalWrite(GpioAddress(0, 01), LOW);
-		// gpioDigitalWrite(GpioAddress(0, 03), LOW);
-		// gpioDigitalWrite(GpioAddress(0, 04), LOW);
-
-		// // no red pin for 5s
-		// gpioDigitalWrite(GpioAddress(2, 017), LOW);
-		// delay(5000);
-
 		char* buf[255];
 
-		gpioDigitalWrite(GpioAddress(0, 05), CUR_PYRO == 0 ? LOW : HIGH); // pyro enabled only if not 0
-		gpioDigitalWrite(GpioAddress(0, 04), CUR_PYRO == 1 ? HIGH : LOW);
-		gpioDigitalWrite(GpioAddress(0, 03), CUR_PYRO == 2 ? HIGH : LOW);
-		gpioDigitalWrite(GpioAddress(0, 01), CUR_PYRO == 3 ? HIGH : LOW);
-		gpioDigitalWrite(GpioAddress(0, 00), CUR_PYRO == 4 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 03), CUR_PYRO == 0 ? LOW : HIGH); // pyro enabled only if not 0
+		gpioDigitalWrite(GpioAddress(0, 00), CUR_PYRO == 1 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 01), CUR_PYRO == 2 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 07), CUR_PYRO == 3 ? HIGH : LOW);
+		gpioDigitalWrite(GpioAddress(0, 06), CUR_PYRO == 4 ? HIGH : LOW);
 
 		size_t bytes_read = Serial.readBytesUntil('\n', (char*)&buf, 10);
 		if(bytes_read > 0) {
 			CUR_PYRO = (CUR_PYRO + 1) % 5;
-			// gpioDigitalWrite(GpioAddress(2, 015), HIGH);
-			// delay(50);
-			// gpioDigitalWrite(GpioAddress(2, 015), LOW);
 			Serial.printf("Cur pyro: %d\n", CUR_PYRO);
 		}
 
@@ -724,26 +557,6 @@ void loop() {
 			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
 		}
 
-
-	// OLD LSM6DSL CODE
-	/*
-		float ax, ay, az, gx, gy, gz;
-		LSM.readAcceleration(ax, ay, az);
-		LSM.readGyroscope(gx, gy, gz);
-
-		Serial.print("gx: ");
-		Serial.print(gx);
-		Serial.print(" gy: ");
-		Serial.print(gy);
-		Serial.print(" gz: ");
-		Serial.print(gz);
-		Serial.print(" ax: ");
-		Serial.print(ax);
-		Serial.print(" ay: ");
-		Serial.print(ay);
-		Serial.print(" az: ");
-		Serial.println(az);
-	*/
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
@@ -765,65 +578,6 @@ void loop() {
 		Serial.print(" ");
 		Serial.println(Z);
 		
-
-		
-
-
-		// SPI.beginTransaction(MMCSPISETTINGS);
-		// digitalWrite(MMC5983_CS, LOW);
-		// SPI.transfer(0x09);
-		// SPI.transfer(0b00000001);
-		// digitalWrite(MMC5983_CS, HIGH);
-		// SPI.endTransaction();
-
-		// delay(20);
-		
-		// // x0
-		// SPI.beginTransaction(MMCSPISETTINGS);
-		// digitalWrite(MMC5983_CS, LOW);
-		// SPI.transfer((0x80 | X_OUT_0_REG));
-		// uint8_t x0 = SPI.transfer(0);
-		// digitalWrite(MMC5983_CS, HIGH);
-		// SPI.endTransaction();
-
-		// // x1
-		// SPI.beginTransaction(MMCSPISETTINGS);
-		// digitalWrite(MMC5983_CS, LOW);
-		// SPI.transfer((0x80 | X_OUT_1_REG));
-		// uint8_t x1 = SPI.transfer(0);
-		// digitalWrite(MMC5983_CS, HIGH);
-		// SPI.endTransaction();
-
-		// // xyz
-		// SPI.beginTransaction(MMCSPISETTINGS);
-		// digitalWrite(MMC5983_CS, LOW);
-		// SPI.transfer((0x80 | XYZ_OUT_2_REG));
-		// uint8_t xyz = SPI.transfer(0);
-		// digitalWrite(MMC5983_CS, HIGH);
-		// SPI.endTransaction();
-
-		// uint32_t xval = ((xyz >> 6) & 0x3) + (x1 << 2) + (x0 << 10);
-
-		// Serial.print("raw: ");
-		// Serial.print(x0, 2);
-		// Serial.print(" ");
-		// Serial.print(x1, 2);
-		// Serial.print(" ");
-		// Serial.print(((xyz >> 6) & 0x3), 2);
-		// Serial.print(" \nRead:");
-		// Serial.println(xval);
-
-		// cx = MMC5983.getMeasurementX();
-		// cy = MMC5983.getMeasurementY();
-		// cz = MMC5983.getMeasurementZ();
-
-		// MMC5983.readFieldsXYZ(&cx, &cy, &cz);
-		// int temp = MMC5983.getTemperature();
-		// Serial.println("MAG:  ");
-		// Serial.print(MMC5983.isXChannelEnabled() ? "X" : "-");
-		// // Serial.print(MMC5983.isConnected() ? "+" : "-");
-		// // Serial.print(MMC5983.getFilterBandwith());
-		// Serial.printf("\nTemp:%d\nX: %f\nY: %F\nZ: %f\n", temp,cx, cy,cz);
 
 	#endif
 
