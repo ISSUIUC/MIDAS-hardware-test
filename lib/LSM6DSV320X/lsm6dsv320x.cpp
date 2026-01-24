@@ -732,6 +732,43 @@ int32_t LSM6DSV320XClass::filt_xl_lp2_bandwidth_set(lsm6dsv320x_filt_xl_lp2_band
   return ret;
 }
 
-int32_t LSM6DSV320XClass::highg_enable(){    lsm6dsv320x_ctrl1_xl_hg_t data;
-    int32_t ret = LSM6DSV320XClass::read_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t*)&data, 1);    data.xl_hg_regout_en = 1;    ret = LSM6DSV320XClass::write_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t*)&data, 1);    return ret;
+int32_t LSM6DSV320XClass::hg_xl_data_rate_set(lsm6dsv320x_hg_xl_data_rate_t val, uint8_t reg_out_en)
+{
+  lsm6dsv320x_ctrl1_t ctrl1;
+  lsm6dsv320x_ctrl2_t ctrl2;
+  lsm6dsv320x_ctrl1_xl_hg_t ctrl1_xl_hg;
+  int32_t ret;
+
+  ret = read_reg(LSM6DSV320X_CTRL1, (uint8_t *)&ctrl1, 1);
+  ret += read_reg(LSM6DSV320X_CTRL2, (uint8_t *)&ctrl2, 1);
+  ret += read_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t *)&ctrl1_xl_hg, 1);
+  if (ret != 0)
+  {
+    goto exit;
+  }
+
+  if (val != LSM6DSV320X_HG_XL_ODR_OFF && ctrl1.odr_xl != LSM6DSV320X_ODR_OFF &&
+      ctrl1.op_mode_xl != LSM6DSV320X_XL_HIGH_PERFORMANCE_MD &&
+      ctrl1.op_mode_xl != LSM6DSV320X_XL_HIGH_ACCURACY_ODR_MD)
+  {
+    ret = -1;
+    goto exit;
+  }
+
+  // if xl or gy are ON in odr triggered mode, high-g xl cannot be turned on
+  if ((ctrl1.odr_xl != LSM6DSV320X_ODR_OFF &&
+       ctrl1.op_mode_xl == LSM6DSV320X_XL_ODR_TRIGGERED_MD) ||
+      (ctrl2.odr_g != LSM6DSV320X_ODR_OFF &&
+       ctrl2.op_mode_g == LSM6DSV320X_GY_ODR_TRIGGERED_MD))
+  {
+    ret = -1;
+    goto exit;
+  }
+
+  ctrl1_xl_hg.odr_xl_hg = (uint8_t)val & 0x07U;
+  ctrl1_xl_hg.xl_hg_regout_en = reg_out_en & 0x1U;
+  ret += write_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t *)&ctrl1_xl_hg, 1);
+
+exit:
+  return ret;
 }

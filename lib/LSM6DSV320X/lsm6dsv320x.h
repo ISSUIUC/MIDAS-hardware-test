@@ -479,7 +479,7 @@ public:
     int32_t filt_xl_lp2_set(uint8_t val);
     int32_t filt_xl_lp2_bandwidth_set(lsm6dsv320x_filt_xl_lp2_bandwidth_t val);
 
-    int32_t highg_enable();
+    int32_t hg_xl_data_rate_set(lsm6dsv320x_hg_xl_data_rate_t val, uint8_t reg_out_en);
 
 private:
     SPIClass * _spi;

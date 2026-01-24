@@ -22,7 +22,7 @@
 
 // SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
 
-// #define WAIT_FOR_SERIAL
+#define WAIT_FOR_SERIAL
 
 // #define MCU_TEST
 // #define I2C_SCAN
@@ -153,6 +153,8 @@ bool cur_light_state = false;
 
 void setup() {
 	Serial.begin(9600);
+
+    Serial.println("HELLO");
 
 
 	#ifdef WAIT_FOR_SERIAL
@@ -295,7 +297,7 @@ void setup() {
     	LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
 		
 		// LSM6DSV_High_G_Enable
-		LSM6DSV.highg_enable();
+		LSM6DSV.hg_xl_data_rate_set(LSM6DSV320X_HG_XL_ODR_AT_960Hz, 1);
 
 
 	#endif
@@ -549,8 +551,7 @@ void loop() {
 		if(status.gda) {
 			LSM6DSV.acceleration_raw_get(raw_accel);
 			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
-		}
-			*/
+		}*/
 			
 
 		if(status.xlhgda) {
@@ -562,8 +563,7 @@ void loop() {
 		if(status.gda) {
 			LSM6DSV.angular_rate_raw_get(raw_ar);
 			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
-		}
-		*/
+		}*/
 
 	#endif
 
@@ -665,6 +665,6 @@ void loop() {
 	#endif
 
 	// Serial.println("Hello world!");
-	delay(50);
+	delay(1000);
 }
 
