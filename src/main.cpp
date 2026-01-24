@@ -22,12 +22,12 @@
 
 // SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
 
-#define WAIT_FOR_SERIAL
+// #define WAIT_FOR_SERIAL
 
-#define MCU_TEST
+// #define MCU_TEST
 // #define I2C_SCAN
 // #define ENABLE_BAROMETER
-// #define ENABLE_IMU
+#define ENABLE_IMU
 // #define ENABLE_MAGNETOMETER
 // #define ENABLE_ADS
 // #define ENABLE_GPIOEXP
@@ -293,6 +293,9 @@ void setup() {
 
 		// LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);
     	LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
+		
+		// LSM6DSV_High_G_Enable
+		LSM6DSV.highg_enable();
 
 
 	#endif
@@ -542,20 +545,25 @@ void loop() {
 
 		lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
 
+		/*
 		if(status.gda) {
 			LSM6DSV.acceleration_raw_get(raw_accel);
 			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
 		}
+			*/
+			
 
 		if(status.xlhgda) {
 			LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
 			Serial.printf("HighG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel_hg[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[2])/1000);
 		}	
 		
+		/*
 		if(status.gda) {
 			LSM6DSV.angular_rate_raw_get(raw_ar);
 			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
 		}
+		*/
 
 	#endif
 

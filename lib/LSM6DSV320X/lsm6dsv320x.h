@@ -479,6 +479,8 @@ public:
     int32_t filt_xl_lp2_set(uint8_t val);
     int32_t filt_xl_lp2_bandwidth_set(lsm6dsv320x_filt_xl_lp2_bandwidth_t val);
 
+    int32_t highg_enable();
+
 private:
     SPIClass * _spi;
     uint8_t _slaveAddress;

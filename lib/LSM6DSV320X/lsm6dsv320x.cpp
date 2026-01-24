@@ -731,3 +731,7 @@ int32_t LSM6DSV320XClass::filt_xl_lp2_bandwidth_set(lsm6dsv320x_filt_xl_lp2_band
 
   return ret;
 }
+
+int32_t LSM6DSV320XClass::highg_enable(){    lsm6dsv320x_ctrl1_xl_hg_t data;
+    int32_t ret = LSM6DSV320XClass::read_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t*)&data, 1);    data.xl_hg_regout_en = 1;    ret = LSM6DSV320XClass::write_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t*)&data, 1);    return ret;
+}
