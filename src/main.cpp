@@ -289,16 +289,18 @@ void setup() {
 
 		else { Serial.println("IMU ID get."); }
 
+        
 		// the second parameter used to be normal instead of high-performance
 		LSM6DSV.xl_setup(LSM6DSV320X_ODR_AT_7Hz5, LSM6DSV320X_XL_HIGH_PERFORMANCE_MD);
-   		LSM6DSV.gy_setup(LSM6DSV320X_ODR_AT_15Hz, LSM6DSV320X_GY_HIGH_PERFORMANCE_MD);
-
+        LSM6DSV.gy_setup(LSM6DSV320X_ODR_AT_15Hz, LSM6DSV320X_GY_HIGH_PERFORMANCE_MD);
+        
 		// LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);
     	LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
 		
 		// LSM6DSV_High_G_Enable
 		LSM6DSV.hg_xl_data_rate_set(LSM6DSV320X_HG_XL_ODR_AT_960Hz, 1);
-
+        
+        LSM6DSV.sflp_enable_set(1);
 
 	#endif
 
@@ -546,6 +548,17 @@ void loop() {
 		int16_t raw_ar[3];
 
 		lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
+
+        uint16_t val;
+
+        LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(&val);
+		Serial.printf("SFLP Quaternion: 0x%lx\n", val);
+
+        LSM6DSV.sflp_gravity_raw_get((int16_t*)&val);
+		Serial.printf("SFLP Gravity vector: 0x%lx\n", val);
+
+        LSM6DSV.sflp_gbias_raw_get((int16_t*)&val);
+		Serial.printf("SFLP Gyroscope Bias: 0x%lx\n", val);
 
 		/*
 		if(status.gda) {
