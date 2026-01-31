@@ -519,7 +519,9 @@ public:
     int32_t angular_rate_raw_get(int16_t *val);
 
     float from_fs2_to_mg(int16_t lsb);
+    float from_fs64_to_mg(int16_t lsb);
     float from_fs2000_to_mdps(int16_t lsb);
+    float from_sflp_to_mg(int16_t lsb);
 
     int32_t xl_setup(lsm6dsv320x_data_rate_t xl_odr, lsm6dsv320x_xl_mode_t xl_mode);//Only sets up lowg
     int32_t gy_setup(lsm6dsv320x_data_rate_t gy_odr, lsm6dsv320x_gy_mode_t gy_mode);
