@@ -18,7 +18,7 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
-#include <lsm6dsv320x.h>
+#include <lsm6dsv320x.h> //should we use _reg file instead?
 
 // SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
 
@@ -549,10 +549,11 @@ void loop() {
 
 		lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
 
-        uint16_t val;
+        uint16_t val[4]; //make this uint16 array
 
-        LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(&val);
-		Serial.printf("SFLP Quaternion: 0x%lx\n", val);
+       LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(val); //send it thru this
+
+		Serial.printf("SFLP Quaternion: 0x%lx\n", val); //display each value in vel --> Fix this line, it is currently nono
 
         LSM6DSV.sflp_gravity_raw_get((int16_t*)&val);
 		Serial.printf("SFLP Gravity vector: 0x%lx\n", val);
@@ -566,6 +567,9 @@ void loop() {
 			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
 		}*/
 			
+
+		LSM6DSV.hg_xl_full_scale_set(LSM6DSV320X_64g); //this line here should set it to 64gs
+		//fs2tomg function only converts at 2g scale, we must find a way to do it in 64g scale. We can figure it out.
 
 		if(status.xlhgda) {
 			LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);

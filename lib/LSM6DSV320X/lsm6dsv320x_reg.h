@@ -4316,13 +4316,13 @@ int32_t lsm6dsv320x_write_reg(const stmdev_ctx_t *ctx, uint8_t reg,
                               uint16_t len);
 
 float_t lsm6dsv320x_from_sflp_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs2_to_mg(int16_t lsb);
+float_t lsm6dsv320x_from_fs2_to_mg(int16_t lsb); //lowg
 float_t lsm6dsv320x_from_fs4_to_mg(int16_t lsb);
 float_t lsm6dsv320x_from_fs8_to_mg(int16_t lsb);
 float_t lsm6dsv320x_from_fs16_to_mg(int16_t lsb);
 
 float_t lsm6dsv320x_from_fs32_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs64_to_mg(int16_t lsb);
+float_t lsm6dsv320x_from_fs64_to_mg(int16_t lsb); //high-g
 float_t lsm6dsv320x_from_fs128_to_mg(int16_t lsb);
 float_t lsm6dsv320x_from_fs256_to_mg(int16_t lsb);
 float_t lsm6dsv320x_from_fs320_to_mg(int16_t lsb);

@@ -527,7 +527,7 @@ public:
 
     int32_t haodr_set(lsm6dsv320x_data_rate_t xl_odr, lsm6dsv320x_xl_mode_t xl_mode, lsm6dsv320x_data_rate_t gy_odr, lsm6dsv320x_gy_mode_t gy_mode);
 
-    int32_t hg_xl_full_scale_set(lsm6dsv320x_hg_xl_full_scale_t val);
+    int32_t hg_xl_full_scale_set(lsm6dsv320x_hg_xl_full_scale_t val); //set scale to 64gs
     int32_t hg_xl_full_scale_get(lsm6dsv320x_hg_xl_full_scale_t *val);
     int32_t gy_full_scale_set(lsm6dsv320x_gy_full_scale_t val);
     int32_t gy_full_scale_get(lsm6dsv320x_gy_full_scale_t *val);
