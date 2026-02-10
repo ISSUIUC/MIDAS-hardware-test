@@ -133,22 +133,22 @@ float_t lsm6dsv320x_from_fs4_to_mg(int16_t lsb)
   return ((float_t)lsb) * 0.122f;
 }
 
-float_t lsm6dsv320x_from_fs8_to_mg(int16_t lsb)
+float_t from_fs8_to_mg(int16_t lsb)
 {
   return ((float_t)lsb) * 0.244f;
 }
 
-float_t lsm6dsv320x_from_fs16_to_mg(int16_t lsb)
+float_t from_fs16_to_mg(int16_t lsb)
 {
   return ((float_t)lsb) * 0.488f;
 }
 
-float_t lsm6dsv320x_from_fs32_to_mg(int16_t lsb)
+float_t from_fs32_to_mg(int16_t lsb)
 {
   return ((float_t)lsb) * 0.976f;
 }
 
-float_t lsm6dsv320x_from_fs64_to_mg(int16_t lsb)
+float_t from_fs64_to_mg(int16_t lsb)
 {
   return ((float_t)lsb) * 1.952f;
 }
@@ -4327,7 +4327,7 @@ int32_t lsm6dsv320x_sflp_quaternion_raw_get(const stmdev_ctx_t *ctx, uint16_t *v
   * @retval          interface status (MANDATORY: return 0 -> no Error)
   *
   */
-int32_t lsm6dsv320x_sflp_quaternion_get(const stmdev_ctx_t *ctx, lsm6dsv320x_quaternion_t *quat)
+int32_t sflp_quaternion_get(const stmdev_ctx_t *ctx, lsm6dsv320x_quaternion_t *quat)
 {
   uint16_t val[4];
   int32_t ret;

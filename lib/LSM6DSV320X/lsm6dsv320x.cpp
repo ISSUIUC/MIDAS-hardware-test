@@ -127,12 +127,106 @@ int32_t LSM6DSV320XClass::angular_rate_raw_get(int16_t *val)
 
 float LSM6DSV320XClass::from_fs2_to_mg(int16_t lsb) //the _reg libraries have the functions, maybe use that. We can figure out.
 {
-  return ((float)lsb) * 0.061f; //if you check the datasheet, you will see that for 64gs, we will have to use different conversion values.
+  return static_cast<float>(lsb) * 0.061f; //if you check the datasheet, you will see that for 64gs, we will have to use different conversion values.
 }
+
+
+float LSM6DSV320XClass::from_fs8_to_mg(int16_t lsb)
+{
+  return static_cast<float>(lsb) * 0.244f;
+}
+
+float LSM6DSV320XClass::from_fs16_to_mg(int16_t lsb) 
+{
+  return static_cast<float>(lsb) * 0.488f;
+}
+
+float LSM6DSV320XClass::from_fs64_to_mg(int16_t lsb)
+{
+  return static_cast<float>(lsb) * 1.952f;
+}
+
 
 float LSM6DSV320XClass::from_fs2000_to_mdps(int16_t lsb)
 {
-  return ((float)lsb) * 70.0f;
+  return static_cast<float>(lsb) * 70.0f;
+}
+
+uint32_t LSM6DSV320XClass::half_to_float(uint16_t h)
+{
+  uint16_t h_exp = (h & 0x7c00u);
+  uint32_t f_sgn = ((uint32_t)h & 0x8000u) << 16;
+  switch (h_exp)
+  {
+    case 0x0000u:   // 0 or subnormal
+    {
+      uint16_t h_sig = (h & 0x03ffu);
+      // Signed zero
+      if (h_sig == 0)
+      {
+        return f_sgn;
+      }
+      // Subnormal
+      h_sig <<= 1;
+      while ((h_sig & 0x0400u) == 0)
+      {
+        h_sig <<= 1;
+        h_exp++;
+      }
+      uint32_t f_exp = ((uint32_t)(127 - 15 - h_exp)) << 23;
+      uint32_t f_sig = ((uint32_t)(h_sig & 0x03ffu)) << 13;
+      return f_sgn + f_exp + f_sig;
+    }
+    case 0x7c00u: // inf or NaN
+      // All-ones exponent and a copy of the significand
+      return f_sgn + 0x7f800000u + (((uint32_t)(h & 0x03ffu)) << 13);
+    default: // normalized
+      // Just need to adjust the exponent and shift
+      return f_sgn + (((uint32_t)(h & 0x7fffu) + 0x1c000u) << 13);
+  }
+}
+
+float LSM6DSV320XClass::sflp_quaternion_raw_to_float(int16_t raw){
+  //Will have to find a half to single precision conversion function somewhere in the codebase
+  return half_to_float((uint16_t)raw);
+}
+
+float LSM6DSV320XClass::sflp_gbias_raw_to_mdps(int16_t raw){
+  return static_cast<float>(raw) * 4.375f;
+}
+
+float LSM6DSV320XClass::sflp_gravity_raw_to_mg(int16_t raw){
+  return static_cast<float>(raw) * 0.061f;
+}
+
+void LSM6DSV320XClass::get_lowg_acceleration_from_fs2_to_g(float *ax, float *ay, float *az) {
+  int16_t raw_accel[NUM_DIRECTIONS];
+  
+  acceleration_raw_get(raw_accel);
+
+  *ax = from_fs2_to_mg(raw_accel[0]) / 1000.0;
+  *ay = from_fs2_to_mg(raw_accel[1]) / 1000.0;
+  *az = from_fs2_to_mg(raw_accel[2]) / 1000.0;
+}
+
+void LSM6DSV320XClass::get_highg_acceleration_from_fs64_to_g(float *ax, float *ay, float *az) {
+  int16_t raw_accel_hg[NUM_DIRECTIONS];
+  
+  hg_acceleration_raw_get(raw_accel_hg);
+  
+  *ax = from_fs64_to_mg(raw_accel_hg[0]) / 1000.0;
+  *ay = from_fs64_to_mg(raw_accel_hg[1]) / 1000.0;
+  *az = from_fs64_to_mg(raw_accel_hg[2]) / 1000.0;
+}
+
+void LSM6DSV320XClass::get_angular_velocity_from_fs2000_to_dps(float *vx, float *vy, float *vz) {
+  int16_t raw_av[NUM_DIRECTIONS];
+  
+  angular_rate_raw_get(raw_av);
+  
+  *vx = from_fs2000_to_mdps(raw_av[0]) / 1000.0;
+  *vy = from_fs2000_to_mdps(raw_av[1]) / 1000.0;
+  *vz = from_fs2000_to_mdps(raw_av[2]) / 1000.0;
 }
 
 /**
@@ -485,13 +579,13 @@ int32_t LSM6DSV320XClass::hg_xl_full_scale_set(lsm6dsv320x_hg_xl_full_scale_t va
   lsm6dsv320x_ctrl1_xl_hg_t ctrl1;
   int32_t ret;
 
-  read_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t *)&ctrl1, 1);
+  ret = read_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t *)&ctrl1, 1);
 
 
   if (ret == 0)
   {
     ctrl1.fs_xl_hg = (uint8_t)val & 0x7U;
-  write_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t *)&ctrl1, 1);
+  ret = write_reg(LSM6DSV320X_CTRL1_XL_HG, (uint8_t *)&ctrl1, 1);
   
 }
 
@@ -618,6 +712,60 @@ int32_t LSM6DSV320XClass::gy_full_scale_get(lsm6dsv320x_gy_full_scale_t *val)
 
     default:
       *val = LSM6DSV320X_250dps;
+      break;
+  }
+
+  return ret;
+}
+
+int32_t LSM6DSV320XClass::xl_full_scale_set(lsm6dsv320x_xl_full_scale_t val)
+{
+  lsm6dsv320x_ctrl8_t ctrl8;
+  int32_t ret;
+
+  ret = read_reg(LSM6DSV320X_CTRL8, (uint8_t *)&ctrl8, 1);
+  //ret = lsm6dsv320x_read_reg(ctx, LSM6DSV320X_CTRL8, (uint8_t *)&ctrl8, 1);
+
+  if (ret == 0)
+  {
+    ctrl8.fs_xl = (uint8_t)val & 0x3U;
+    ret = write_reg(LSM6DSV320X_CTRL8, (uint8_t *)&ctrl8, 1);
+    //ret = lsm6dsv320x_write_reg(ctx, LSM6DSV320X_CTRL8, (uint8_t *)&ctrl8, 1);
+  }
+
+  return ret;
+}
+
+int32_t LSM6DSV320XClass::xl_full_scale_get(lsm6dsv320x_xl_full_scale_t *val) {
+  lsm6dsv320x_ctrl8_t ctrl8;
+  int32_t ret;
+
+  ret = read_reg(LSM6DSV320X_CTRL8, (uint8_t *)&ctrl8, 1);
+  if (ret != 0)
+  {
+    return ret;
+  }
+
+  switch (ctrl8.fs_xl)
+  {
+    case LSM6DSV320X_2g:
+      *val = LSM6DSV320X_2g;
+      break;
+
+    case LSM6DSV320X_4g:
+      *val = LSM6DSV320X_4g;
+      break;
+
+    case LSM6DSV320X_8g:
+      *val = LSM6DSV320X_8g;
+      break;
+
+    case LSM6DSV320X_16g:
+      *val = LSM6DSV320X_16g;
+      break;
+
+    default:
+      *val = LSM6DSV320X_2g;
       break;
   }
 

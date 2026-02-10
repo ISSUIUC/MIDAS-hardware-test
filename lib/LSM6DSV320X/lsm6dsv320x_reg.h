@@ -100,6 +100,9 @@ typedef struct
 #define PROPERTY_DISABLE                (0U)
 #define PROPERTY_ENABLE                 (1U)
 
+//ISS Custom
+#define NUM_DIRECTIONS                             3
+
 /** @addtogroup  Interfaces_Functions
   * @brief       This section provide a set of functions used to read and
   *              write a generic register of the device.
@@ -4308,39 +4311,39 @@ typedef union
  * them with a custom implementation.
  */
 
-int32_t lsm6dsv320x_read_reg(const stmdev_ctx_t *ctx, uint8_t reg,
+int32_t read_reg(const stmdev_ctx_t *ctx, uint8_t reg,
                              uint8_t *data,
                              uint16_t len);
-int32_t lsm6dsv320x_write_reg(const stmdev_ctx_t *ctx, uint8_t reg,
+int32_t write_reg(const stmdev_ctx_t *ctx, uint8_t reg,
                               uint8_t *data,
                               uint16_t len);
 
-float_t lsm6dsv320x_from_sflp_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs2_to_mg(int16_t lsb); //lowg
-float_t lsm6dsv320x_from_fs4_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs8_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs16_to_mg(int16_t lsb);
+float_t from_sflp_to_mg(int16_t lsb);
+float_t from_fs2_to_mg(int16_t lsb); //lowg
+float_t from_fs4_to_mg(int16_t lsb);
+float_t from_fs8_to_mg(int16_t lsb);
+float_t from_fs16_to_mg(int16_t lsb);
 
-float_t lsm6dsv320x_from_fs32_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs64_to_mg(int16_t lsb); //high-g
-float_t lsm6dsv320x_from_fs128_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs256_to_mg(int16_t lsb);
-float_t lsm6dsv320x_from_fs320_to_mg(int16_t lsb);
+float_t from_fs32_to_mg(int16_t lsb);
+float_t from_fs64_to_mg(int16_t lsb); //high-g
+float_t from_fs128_to_mg(int16_t lsb);
+float_t from_fs256_to_mg(int16_t lsb);
+float_t from_fs320_to_mg(int16_t lsb);
 
-float_t lsm6dsv320x_from_fs125_to_mdps(int16_t lsb);
-float_t lsm6dsv320x_from_fs250_to_mdps(int16_t lsb);
-float_t lsm6dsv320x_from_fs500_to_mdps(int16_t lsb);
-float_t lsm6dsv320x_from_fs1000_to_mdps(int16_t lsb);
-float_t lsm6dsv320x_from_fs2000_to_mdps(int16_t lsb);
-float_t lsm6dsv320x_from_fs4000_to_mdps(int16_t lsb);
+float_t from_fs125_to_mdps(int16_t lsb);
+float_t from_fs250_to_mdps(int16_t lsb);
+float_t from_fs500_to_mdps(int16_t lsb);
+float_t from_fs1000_to_mdps(int16_t lsb);
+float_t from_fs2000_to_mdps(int16_t lsb);
+float_t from_fs4000_to_mdps(int16_t lsb);
 
-float_t lsm6dsv320x_from_lsb_to_celsius(int16_t lsb);
+float_t from_lsb_to_celsius(int16_t lsb);
 
-uint64_t lsm6dsv320x_from_lsb_to_nsec(uint32_t lsb);
+uint64_t _from_lsb_to_nsec(uint32_t lsb);
 
-float_t lsm6dsv320x_from_lsb_to_mv(int16_t lsb);
+float_t from_lsb_to_mv(int16_t lsb);
 
-float_t lsm6dsv320x_from_gbias_lsb_to_mdps(int16_t lsb);
+float_t from_gbias_lsb_to_mdps(int16_t lsb);
 float_t lsm6dsv320x_from_gravity_lsb_to_mg(int16_t lsb);
 float_t lsm6dsv320x_from_quaternion_lsb_to_float(uint16_t lsb);
 
@@ -4781,9 +4784,9 @@ int32_t lsm6dsv320x_ois_acceleration_raw_get(const stmdev_ctx_t *ctx, int16_t *v
 
 int32_t lsm6dsv320x_hg_acceleration_raw_get(const stmdev_ctx_t *ctx, int16_t *val);
 
-int32_t lsm6dsv320x_sflp_gbias_raw_get(const stmdev_ctx_t *ctx, int16_t *val);
-int32_t lsm6dsv320x_sflp_gravity_raw_get(const stmdev_ctx_t *ctx, int16_t *val);
-int32_t lsm6dsv320x_sflp_quaternion_raw_get(const stmdev_ctx_t *ctx, uint16_t *val);
+int32_t sflp_gbias_raw_get(const stmdev_ctx_t *ctx, int16_t *val);
+int32_t sflp_gravity_raw_get(const stmdev_ctx_t *ctx, int16_t *val);
+int32_t sflp_quaternion_raw_get(const stmdev_ctx_t *ctx, uint16_t *val);
 
 int32_t lsm6dsv320x_odr_cal_reg_get(const stmdev_ctx_t *ctx, int8_t *val);
 

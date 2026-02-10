@@ -18,7 +18,7 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
-#include <lsm6dsv320x.h> //should we use _reg file instead?
+#include <lsm6dsv320x.cpp> //should we use _reg file instead?
 
 // SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
 
@@ -288,19 +288,28 @@ void setup() {
 		if(whoami != LSM6DSV320X_ID) { Serial.println("IMU Error. Cannot get the ID."); }
 
 		else { Serial.println("IMU ID get."); }
-
-        
+		
+		LSM6DSV.sw_por();
+		
 		// the second parameter used to be normal instead of high-performance
 		LSM6DSV.xl_setup(LSM6DSV320X_ODR_AT_7Hz5, LSM6DSV320X_XL_HIGH_PERFORMANCE_MD);
-        LSM6DSV.gy_setup(LSM6DSV320X_ODR_AT_15Hz, LSM6DSV320X_GY_HIGH_PERFORMANCE_MD);
-        
-		// LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);
-    	LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
+		LSM6DSV.gy_setup(LSM6DSV320X_ODR_AT_15Hz, LSM6DSV320X_GY_HIGH_PERFORMANCE_MD);
+		LSM6DSV.hg_xl_data_rate_set(LSM6DSV320X_HG_XL_ODR_AT_960Hz, 1);//xl_setup only handles lowg, this should also set the enable register
 		
-		// LSM6DSV_High_G_Enable
-		LSM6DSV.hg_xl_data_rate_set(LSM6DSV320X_HG_XL_ODR_AT_960Hz, 1);
-        
-        LSM6DSV.sflp_enable_set(1);
+		LSM6DSV.hg_xl_full_scale_set(LSM6DSV320X_64g);//highg scale set
+		LSM6DSV.xl_full_scale_set(LSM6DSV320X_8g);//lowg scale set
+		LSM6DSV.gy_full_scale_set(LSM6DSV320X_2000dps);
+		
+		LSM6DSV.sflp_enable_set(1);
+
+		//Filter initialization (I really have no idea)
+		LSM6DSV.filt_settling_mask_set(false, false, false);
+
+		// Low-pass filters:
+		LSM6DSV.filt_gy_lp1_set(PROPERTY_DISABLE);
+		//lsm6dsv320x_filt_gy_lp1_bandwidth_set(&dev_ctx, lsm6dsv320x_GY_ULTRA_LIGHT);
+		LSM6DSV.filt_xl_lp2_set(PROPERTY_DISABLE);
+		//lsm6dsv320x_filt_xl_lp2_bandwidth_set(&dev_ctx, lsm6dsv320x_XL_STRONG);
 
 	#endif
 
@@ -550,22 +559,11 @@ void loop() {
 		lsm6dsv320x_status_reg_t status = LSM6DSV.get_status();
 
         uint16_t val[4]; //make this uint16 array
-
-       LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(val); //send it thru this
-
-		Serial.printf("SFLP Quaternion: 0x%lx\n", val); //display each value in vel --> Fix this line, it is currently nono
-
-        LSM6DSV.sflp_gravity_raw_get((int16_t*)&val);
-		Serial.printf("SFLP Gravity vector: 0x%lx\n", val);
-
-        LSM6DSV.sflp_gbias_raw_get((int16_t*)&val);
-		Serial.printf("SFLP Gyroscope Bias: 0x%lx\n", val);
-
-		/*
+		
 		if(status.gda) {
 			LSM6DSV.acceleration_raw_get(raw_accel);
-			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
-		}*/
+			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs8_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
+		}
 			
 
 		LSM6DSV.hg_xl_full_scale_set(LSM6DSV320X_64g); //this line here should set it to 64gs
@@ -573,15 +571,51 @@ void loop() {
 
 		if(status.xlhgda) {
 			LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
-			Serial.printf("HighG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2_to_mg(raw_accel_hg[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[2])/1000);
+			Serial.printf("HighG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs64_to_mg(raw_accel_hg[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[2])/1000);
 		}	
 		
-		/*
+		
 		if(status.gda) {
 			LSM6DSV.angular_rate_raw_get(raw_ar);
 			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
-		}*/
+		}
 
+		uint16_t value[4];
+
+		uint16_t quat[4];
+		uint16_t gbias[3];
+		uint16_t gravity[3];
+
+		LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(value);//4 elements
+
+		quat[0] = LSM6DSV.sflp_quaternion_raw_to_float(value[0]);//Will have to find a half to single precision conversion function somewhere
+		quat[1] = LSM6DSV.sflp_quaternion_raw_to_float(value[1]);
+		quat[2] = LSM6DSV.sflp_quaternion_raw_to_float(value[2]);
+		quat[3] = LSM6DSV.sflp_quaternion_raw_to_float(value[3]);
+
+		//(Feature) UPDATE TO USE FIFO -> If the readings are currently okay, this wont be a priority. Circular Buffer FIFO will be a feature
+		LSM6DSV.sflp_gbias_raw_get((int16_t*)&value);//3 elements
+
+		gbias[0] = LSM6DSV.sflp_gbias_raw_to_mdps(value[0]);
+		gbias[1] = LSM6DSV.sflp_gbias_raw_to_mdps(value[1]);
+		gbias[2] = LSM6DSV.sflp_gbias_raw_to_mdps(value[2]);
+
+		//UPDATE TO USE FIFO -> If the readings are currently okay, Circular Buffer FIFO will be a feature
+		LSM6DSV.sflp_gravity_raw_get((int16_t*)&value);//3 elements
+		
+		gravity[0] = LSM6DSV.sflp_gravity_raw_to_mg(value[0]);
+		gravity[1] = LSM6DSV.sflp_gravity_raw_to_mg(value[1]);
+		gravity[2] = LSM6DSV.sflp_gravity_raw_to_mg(value[2]);
+
+
+		Serial.printf("\nSFLP Quaternion:\nx: %d\ny: %d\nz: %d\nfourth-axis: %d", quat[0], quat[1], quat[2], quat[3]);
+
+		Serial.printf("\nSFLP Gravity vector:\nx: %d\ny: %d\nz: %d", gravity[0], gravity[1], gravity[2]);
+
+		Serial.printf("\nSFLP Gyroscope Bias:\nx: %d\ny: %d\nz: %d\n ", gbias[0], gbias[1], gbias[2]);
+
+
+		sleep(1);
 	#endif
 
 	#ifdef ENABLE_MAGNETOMETER
