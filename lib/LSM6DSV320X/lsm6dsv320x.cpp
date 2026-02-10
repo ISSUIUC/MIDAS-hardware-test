@@ -229,6 +229,11 @@ void LSM6DSV320XClass::get_angular_velocity_from_fs2000_to_dps(float *vx, float 
   *vz = from_fs2000_to_mdps(raw_av[2]) / 1000.0;
 }
 
+float LSM6DSV320XClass::from_sflp_to_mg(int16_t lsb)
+{
+  return ((float)lsb) * 0.061f;
+}
+
 /**
   * @brief  Device ID.[get]
   *

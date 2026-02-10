@@ -18,8 +18,8 @@
 #include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
 #include <LoRaWan-Arduino.h>
 
-#include <lsm6dsv320x.cpp> //should we use _reg file instead?
-
+#include <lsm6dsv320x.h> //should we use _reg file instead?
+#include <lsm6dsv320x.h>
 // SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
 
 #define WAIT_FOR_SERIAL
@@ -565,9 +565,6 @@ void loop() {
 			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs8_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
 		}
 			
-
-		LSM6DSV.hg_xl_full_scale_set(LSM6DSV320X_64g); //this line here should set it to 64gs
-		//fs2tomg function only converts at 2g scale, we must find a way to do it in 64g scale. We can figure it out.
 
 		if(status.xlhgda) {
 			LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
