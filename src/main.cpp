@@ -19,7 +19,6 @@
 #include <LoRaWan-Arduino.h>
 
 #include <lsm6dsv320x.h> //should we use _reg file instead?
-#include <lsm6dsv320x.h>
 // SPISettings MMCSPISETTINGS = SPISettings(2000000, MSBFIRST, SPI_MODE0);
 
 #define WAIT_FOR_SERIAL
@@ -552,6 +551,7 @@ void loop() {
 
 	#ifdef ENABLE_IMU
 
+        /*
 		int16_t raw_accel[3];
 		int16_t raw_accel_hg[3];
 		int16_t raw_ar[3];
@@ -576,12 +576,13 @@ void loop() {
 			LSM6DSV.angular_rate_raw_get(raw_ar);
 			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
 		}
+        */
 
 		uint16_t value[4];
 
-		uint16_t quat[4];
-		uint16_t gbias[3];
-		uint16_t gravity[3];
+		float quat[4];
+		int16_t gbias[3];
+		int16_t gravity[3];
 
 		LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(value);//4 elements
 
@@ -605,7 +606,7 @@ void loop() {
 		gravity[2] = LSM6DSV.sflp_gravity_raw_to_mg(value[2]);
 
 
-		Serial.printf("\nSFLP Quaternion:\nx: %d\ny: %d\nz: %d\nfourth-axis: %d", quat[0], quat[1], quat[2], quat[3]);
+		Serial.printf("\nSFLP Quaternion:\nx: %f\ny: %f\nz: %f\nfourth-axis: %f", quat[0], quat[1], quat[2], quat[3]);
 
 		Serial.printf("\nSFLP Gravity vector:\nx: %d\ny: %d\nz: %d", gravity[0], gravity[1], gravity[2]);
 

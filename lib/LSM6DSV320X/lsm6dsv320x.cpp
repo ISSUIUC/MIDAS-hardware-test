@@ -199,14 +199,14 @@ float LSM6DSV320XClass::sflp_gravity_raw_to_mg(int16_t raw){
   return static_cast<float>(raw) * 0.061f;
 }
 
-void LSM6DSV320XClass::get_lowg_acceleration_from_fs2_to_g(float *ax, float *ay, float *az) {
+void LSM6DSV320XClass::get_lowg_acceleration_from_fs8_to_g(float *ax, float *ay, float *az) {
   int16_t raw_accel[NUM_DIRECTIONS];
   
   acceleration_raw_get(raw_accel);
 
-  *ax = from_fs2_to_mg(raw_accel[0]) / 1000.0;
-  *ay = from_fs2_to_mg(raw_accel[1]) / 1000.0;
-  *az = from_fs2_to_mg(raw_accel[2]) / 1000.0;
+  *ax = from_fs8_to_mg(raw_accel[0]) / 1000.0;
+  *ay = from_fs8_to_mg(raw_accel[1]) / 1000.0;
+  *az = from_fs8_to_mg(raw_accel[2]) / 1000.0;
 }
 
 void LSM6DSV320XClass::get_highg_acceleration_from_fs64_to_g(float *ax, float *ay, float *az) {
@@ -227,11 +227,6 @@ void LSM6DSV320XClass::get_angular_velocity_from_fs2000_to_dps(float *vx, float 
   *vx = from_fs2000_to_mdps(raw_av[0]) / 1000.0;
   *vy = from_fs2000_to_mdps(raw_av[1]) / 1000.0;
   *vz = from_fs2000_to_mdps(raw_av[2]) / 1000.0;
-}
-
-float LSM6DSV320XClass::from_sflp_to_mg(int16_t lsb)
-{
-  return ((float)lsb) * 0.061f;
 }
 
 /**
