@@ -581,8 +581,8 @@ void loop() {
 		uint16_t value[4];
 
 		float quat[4];
-		int16_t gbias[3];
-		int16_t gravity[3];
+		float gbias[3];
+		float gravity[3];
 
 		LSM6DSV.lsm6dsv320x_sflp_quaternion_raw_get(value);//4 elements
 
@@ -594,23 +594,23 @@ void loop() {
 		//(Feature) UPDATE TO USE FIFO -> If the readings are currently okay, this wont be a priority. Circular Buffer FIFO will be a feature
 		LSM6DSV.sflp_gbias_raw_get((int16_t*)&value);//3 elements
 
-		gbias[0] = LSM6DSV.sflp_gbias_raw_to_mdps(value[0]);
-		gbias[1] = LSM6DSV.sflp_gbias_raw_to_mdps(value[1]);
-		gbias[2] = LSM6DSV.sflp_gbias_raw_to_mdps(value[2]);
+		gbias[0] = LSM6DSV.sflp_gbias_raw_to_mdps(value[0]) / 1000.0;
+		gbias[1] = LSM6DSV.sflp_gbias_raw_to_mdps(value[1]) / 1000.0;
+		gbias[2] = LSM6DSV.sflp_gbias_raw_to_mdps(value[2]) / 1000.0;
 
 		//UPDATE TO USE FIFO -> If the readings are currently okay, Circular Buffer FIFO will be a feature
 		LSM6DSV.sflp_gravity_raw_get((int16_t*)&value);//3 elements
 		
-		gravity[0] = LSM6DSV.sflp_gravity_raw_to_mg(value[0]);
-		gravity[1] = LSM6DSV.sflp_gravity_raw_to_mg(value[1]);
-		gravity[2] = LSM6DSV.sflp_gravity_raw_to_mg(value[2]);
+		gravity[0] = LSM6DSV.sflp_gravity_raw_to_mg(value[0]) / 1000.0;
+		gravity[1] = LSM6DSV.sflp_gravity_raw_to_mg(value[1]) / 1000.0;
+		gravity[2] = LSM6DSV.sflp_gravity_raw_to_mg(value[2]) / 1000.0;
 
 
 		Serial.printf("\nSFLP Quaternion:\nx: %f\ny: %f\nz: %f\nfourth-axis: %f", quat[0], quat[1], quat[2], quat[3]);
 
-		Serial.printf("\nSFLP Gravity vector:\nx: %d\ny: %d\nz: %d", gravity[0], gravity[1], gravity[2]);
+		Serial.printf("\nSFLP Gravity vector:\nx: %f\ny: %f\nz: %f", gravity[0], gravity[1], gravity[2]);
 
-		Serial.printf("\nSFLP Gyroscope Bias:\nx: %d\ny: %d\nz: %d\n ", gbias[0], gbias[1], gbias[2]);
+		Serial.printf("\nSFLP Gyroscope Bias:\nx: %f\ny: %f\nz: %f\n ", gbias[0], gbias[1], gbias[2]);
 
 
 		sleep(1);
