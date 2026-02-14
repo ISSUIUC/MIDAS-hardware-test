@@ -9,13 +9,13 @@
 #define MS5611_CS 44
 
 // magnetometer chip select
-#define MAG_CS 4
+#define MMC5983_CS 4
 #define MAG_INT 7
 
 // IMU chip select, interrupt
 #define LSM_INT1 15
 #define LSM_INT2 42
-#define LSM_CS 43
+#define LSM6DSV320X_CS 43
 
 // i2c bus pins
 #define I2C_SDA 21
