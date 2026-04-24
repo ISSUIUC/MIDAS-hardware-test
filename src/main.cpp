@@ -551,7 +551,7 @@ void loop() {
 
 	#ifdef ENABLE_IMU
 
-        /*
+        
 		int16_t raw_accel[3];
 		int16_t raw_accel_hg[3];
 		int16_t raw_ar[3];
@@ -562,13 +562,13 @@ void loop() {
 		
 		if(status.gda) {
 			LSM6DSV.acceleration_raw_get(raw_accel);
-			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs8_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel[2])/1000);
+			Serial.printf("LowG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs8_to_mg(raw_accel[0])/1000, LSM6DSV.from_fs8_to_mg(raw_accel[1])/1000, LSM6DSV.from_fs8_to_mg(raw_accel[2])/1000);
 		}
 			
 
 		if(status.xlhgda) {
 			LSM6DSV.hg_acceleration_raw_get(raw_accel_hg);
-			Serial.printf("HighG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs64_to_mg(raw_accel_hg[0])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[1])/1000, LSM6DSV.from_fs2_to_mg(raw_accel_hg[2])/1000);
+			Serial.printf("HighG Acceleration\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs64_to_mg(raw_accel_hg[0])/1000, LSM6DSV.from_fs64_to_mg(raw_accel_hg[1])/1000, LSM6DSV.from_fs64_to_mg(raw_accel_hg[2])/1000);
 		}	
 		
 		
@@ -576,7 +576,7 @@ void loop() {
 			LSM6DSV.angular_rate_raw_get(raw_ar);
 			Serial.printf("Angular Rate\nX: %f\nY: %F\nZ: %f\n", LSM6DSV.from_fs2000_to_mdps(raw_ar[0])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[1])/1000, LSM6DSV.from_fs2000_to_mdps(raw_ar[2])/1000);
 		}
-        */
+        
 
 		uint16_t value[4];
 
